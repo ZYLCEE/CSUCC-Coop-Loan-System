@@ -1,0 +1,18 @@
+[api]
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+[db]
+port = 54322
+shadow_port = 54320
+major_version = 15
+[studio]
+enabled = true
+port = 54323
+
+[functions]
+[functions.secure-admin-action]
+verify_jwt = false
+
+[functions.list-admin-accounts]
+verify_jwt = false

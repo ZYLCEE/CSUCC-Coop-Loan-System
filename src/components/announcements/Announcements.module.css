@@ -1,0 +1,11 @@
+.scope { min-width: 0; color: #17212f; }
+.scope :global(.announcement-secondary) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  border: 1px solid #e2e8f0; border-radius: 8px; background: #fff;
+  padding: 7px 11px; font-size: 12px; font-weight: 600; color: #145b3c;
+}
+.scope :global(.announcement-secondary:hover) { background: #f0f6f2; }
+.scope :global(button:focus-visible), .scope :global(input:focus-visible),
+.scope :global(select:focus-visible), .scope :global(textarea:focus-visible) { outline: 2px solid #145b3c; outline-offset: 2px; }
+.scope :global(button:disabled) { cursor: not-allowed; opacity: .45; }
+.scope :global(input), .scope :global(select), .scope :global(textarea) { min-width: 0; max-width: 100%; }

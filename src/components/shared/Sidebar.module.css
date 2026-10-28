@@ -1,0 +1,122 @@
+.sidebar {
+  --sidebar-item-height: 38px;
+  --sidebar-font-size: 13.5px;
+  --sidebar-item-gap: 2px;
+  --sidebar-section-gap: 8px;
+  --sidebar-heading-gap: 4px;
+  --sidebar-header-height: 56px;
+  --sidebar-nav-padding: 8px;
+  --sidebar-footer-padding: 8px;
+
+  height: 100vh;
+  height: 100dvh;
+}
+
+.header {
+  height: var(--sidebar-header-height);
+}
+
+.toggle {
+  width: 36px;
+  height: 36px;
+}
+
+.navigation {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: thin;
+  scrollbar-color: #8bb3a1 transparent;
+  padding: var(--sidebar-nav-padding) 12px;
+}
+
+.groups {
+  display: grid;
+  gap: var(--sidebar-section-gap);
+}
+
+.heading {
+  margin-bottom: var(--sidebar-heading-gap);
+  padding-inline: 12px;
+  color: #b3d0c1;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 12px;
+  letter-spacing: 0.07em;
+  white-space: nowrap;
+}
+
+.items {
+  display: grid;
+  gap: var(--sidebar-item-gap);
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  height: var(--sidebar-item-height);
+  border-radius: 8px;
+  font-size: var(--sidebar-font-size);
+  font-weight: 600;
+  line-height: 20px;
+  transition: color 150ms, background-color 150ms;
+}
+
+.item:focus-visible,
+.toggle:focus-visible {
+  outline: 2px solid #e7c84b;
+  outline-offset: -2px;
+}
+
+.footer {
+  margin-inline: 12px;
+  padding-block: var(--sidebar-footer-padding);
+}
+
+@media (min-height: 901px) {
+  .sidebar {
+    --sidebar-item-height: 40px;
+    --sidebar-font-size: 14px;
+    --sidebar-item-gap: 3px;
+    --sidebar-section-gap: 12px;
+    --sidebar-heading-gap: 5px;
+    --sidebar-header-height: 64px;
+    --sidebar-nav-padding: 10px;
+    --sidebar-footer-padding: 10px;
+  }
+}
+
+@media (max-height: 760px) {
+  .sidebar {
+    --sidebar-item-height: 36px;
+    --sidebar-font-size: 13px;
+    --sidebar-section-gap: 6px;
+    --sidebar-heading-gap: 3px;
+    --sidebar-header-height: 52px;
+    --sidebar-nav-padding: 6px;
+    --sidebar-footer-padding: 6px;
+  }
+}
+
+@media (max-height: 699px) {
+  .sidebar {
+    --sidebar-section-gap: 4px;
+    --sidebar-heading-gap: 2px;
+    --sidebar-header-height: 48px;
+    --sidebar-nav-padding: 4px;
+    --sidebar-footer-padding: 4px;
+  }
+
+  .toggle {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+}
