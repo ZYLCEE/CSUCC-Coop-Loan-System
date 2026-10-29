@@ -14,7 +14,6 @@ import {
   Bell,
   Megaphone,
   Folder,
-  Layers3,
   BarChart3,
   ClipboardList,
   Settings,
@@ -65,7 +64,6 @@ function createNavGroups(prefix: string): NavSection[] {
       label: "SYSTEM MANAGEMENT",
       items: [
         { icon: Folder, label: "Documents", href: href(prefix ? "system-management" : "documents") },
-        { icon: Layers3, label: "Content Manager", href: href("content-manager") },
         { icon: BarChart3, label: "Reports", href: href("reports") },
         { icon: ClipboardList, label: "Audit Logs", href: href("audit-logs") },
       ],

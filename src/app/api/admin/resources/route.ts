@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
 const tables: Record<string, string> = { active: 'loan_applications', loans: 'loan_applications', members: 'members', payments: 'loan_payments', audit: 'admin_activity_logs' };
-const configNames = new Set(['general', 'loan-types', 'content-banners', 'content-home', 'content-faq', 'content-contact', 'content-branding']);
+const configNames = new Set(['general']);
 const bucket = 'coop-admin-resources';
 
 export async function GET(request: Request) { return handle(request); }
@@ -34,6 +34,42 @@ async function handle(request: Request) {
       return Response.json(resource === 'active' ? rows.filter(row => ['approved','released','overdue'].includes(String(row.status))) : rows, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (!configNames.has(resource) && resource !== 'documents') return Response.json({ error: 'Unknown resource or unsupported operation.' }, { status: 400 });
+    if (resource === 'documents' && !write) {
+      const documents = [];
+      // Loan attachments live in their own table/bucket, independently of portal uploads.
+      for (let offset = 0; ; offset += 100) {
+        const { data, error } = await client.from('loan_documents')
+          .select('id,kind,original_name,storage_path,size_bytes,created_at,loan_applications(application_id)')
+          .order('created_at', { ascending: false }).order('id').range(offset, offset + 99);
+        if (error) throw error;
+        if (!data.length) break;
+        documents.push(...await Promise.all(data.map(async file => {
+          const { data: link, error } = await client.storage.from('loan-documents').createSignedUrl(file.storage_path, 300);
+          const application = Array.isArray(file.loan_applications) ? file.loan_applications[0] : file.loan_applications;
+          return { id: `loan:${file.id}`, name: file.original_name, size: file.size_bytes, createdAt: file.created_at,
+            source: 'loan', kind: file.kind, applicationId: application?.application_id ?? null,
+            url: error ? null : link?.signedUrl ?? null, linkError: error ? 'File unavailable. Refresh to retry.' : null };
+        })));
+      }
+      const { data: existing, error: bucketError } = await client.storage.getBucket(bucket);
+      if (bucketError && !/not found/i.test(bucketError.message)) throw bucketError;
+      if (existing) {
+        for (let offset = 0; ; offset += 100) {
+          const { data, error } = await client.storage.from(bucket).list('documents', { limit: 100, offset, sortBy: { column: 'name', order: 'asc' } });
+          if (error) throw error;
+          documents.push(...await Promise.all(data.filter(file => file.id).map(async file => {
+            const path = `documents/${file.name}`;
+            const { data: link, error } = await client.storage.from(bucket).createSignedUrl(path, 300);
+            return { id: path, name: file.name.replace(/^[0-9a-f-]{36}-/, ''), size: file.metadata?.size ?? null,
+              createdAt: file.created_at, source: 'cooperative', kind: null, applicationId: null,
+              url: error ? null : link?.signedUrl ?? null, linkError: error ? 'File unavailable. Refresh to retry.' : null };
+          })));
+          if (data.length < 100) break;
+        }
+      }
+      documents.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)) || a.id.localeCompare(b.id));
+      return Response.json(documents, { headers: { 'Cache-Control': 'no-store' } });
+    }
     const { data: existing, error: bucketError } = await client.storage.getBucket(bucket);
     if (!existing) {
       if (!write) return Response.json(resource !== 'general' ? [] : {});
@@ -42,17 +78,6 @@ async function handle(request: Request) {
       if (error && !/already exists/i.test(error.message)) throw error;
     }
     if (resource === 'documents') {
-      if (!write) {
-        const { data, error } = await client.storage.from(bucket).list('documents', { limit: 1000, sortBy: { column: 'created_at', order: 'desc' } });
-        if (error) throw error;
-        const documents = await Promise.all(data.filter(file => file.id).map(async file => {
-          const path = `documents/${file.name}`;
-          const { data: link, error } = await client.storage.from(bucket).createSignedUrl(path, 300);
-          if (error) throw error;
-          return { id: path, name: file.name.replace(/^[0-9a-f-]{36}-/, ''), size: file.metadata?.size, createdAt: file.created_at, url: link.signedUrl };
-        }));
-        return Response.json(documents);
-      }
       if (request.method === 'POST') {
         const form = await request.formData();
         const file = form.get('file');

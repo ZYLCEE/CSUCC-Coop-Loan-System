@@ -43,10 +43,6 @@ const pageHeaders: Record<string, { title: string; subtitle: string }> = {
     title: "Documents",
     subtitle: "Manage cooperative and member documents",
   },
-  "/content-manager": {
-    title: "Content Manager",
-    subtitle: "Manage system content and information",
-  },
   "/reports": {
     title: "Reports",
     subtitle: "View and generate cooperative reports",

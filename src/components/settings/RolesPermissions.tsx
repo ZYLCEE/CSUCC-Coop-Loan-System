@@ -22,7 +22,6 @@ export default function RolesPermissions() {
     { module: "Notifications", superAdmin: true, manager: true, loanOfficer: true, cashier: false, encoder: false },
     { module: "Announcements", superAdmin: true, manager: true, loanOfficer: true, cashier: false, encoder: false },
     { module: "Documents", superAdmin: true, manager: true, loanOfficer: false, cashier: false, encoder: false },
-    { module: "Content Manager", superAdmin: true, manager: true, loanOfficer: false, cashier: false, encoder: false },
     { module: "Reports", superAdmin: true, manager: true, loanOfficer: false, cashier: false, encoder: false },
     { module: "Audit Logs", superAdmin: true, manager: false, loanOfficer: false, cashier: false, encoder: false },
     { module: "Settings", superAdmin: true, manager: false, loanOfficer: false, cashier: false, encoder: false },

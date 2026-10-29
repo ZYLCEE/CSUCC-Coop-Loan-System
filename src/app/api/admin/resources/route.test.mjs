@@ -38,3 +38,54 @@ test('portal settings are persisted only after validation and use private storag
 test('document path traversal is rejected before storage deletion',async()=>{
   const f=setup();assert.equal((await f.DELETE(f.request('documents','DELETE',{id:'configuration/../general.json'}))).status,400);assert.equal(f.calls.length,0);
 });
+
+function documentStorage(f, { missingBucket = false, brokenPath = '' } = {}) {
+  f.client.storage.getBucket = async () => ({ data: missingBucket ? null : { name: 'coop-admin-resources' }, error: missingBucket ? { message: 'Bucket not found' } : null });
+  f.client.storage.from = bucket => ({
+    list: async (_prefix, options) => {
+      f.calls.push({ bucket, offset: options.offset });
+      return { data: options.offset ? [] : [{ id: 'upload', name: 'policy.pdf', metadata: { size: 2048 }, created_at: '2026-10-29' }], error: null };
+    },
+    createSignedUrl: async (path, expiry) => {
+      f.calls.push({ bucket, path, expiry });
+      return path === brokenPath ? { data: null, error: { message: 'Object not found' } } : { data: { signedUrl: `https://storage.test/${bucket}/${path}` }, error: null };
+    },
+  });
+}
+const attachment = (id, path = 'member/file.pdf') => ({ id, original_name: 'ID.pdf', kind: 'validId', storage_path: path, size_bytes: 1024, created_at: '2026-10-28', loan_applications: { application_id: 'APP-001' } });
+
+test('documents combine existing loan attachments and cooperative uploads using the correct private buckets', async () => {
+  const f = setup('admin', [[attachment('one')], []]); documentStorage(f);
+  const response = await f.GET(f.request('documents'));
+  assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
+  const rows = await response.json(); assert.equal(rows.length, 2);
+  const loan = rows.find(row => row.source === 'loan');
+  assert.equal(loan.applicationId, 'APP-001'); assert.equal(loan.name, 'ID.pdf'); assert.equal(loan.id, 'loan:one');
+  assert.equal(loan.url, 'https://storage.test/loan-documents/member/file.pdf');
+  assert.ok(f.calls.some(call => call.bucket === 'coop-admin-resources' && call.path === 'documents/policy.pdf'));
+  assert.ok(f.calls.filter(call => call.expiry).every(call => call.expiry === 300));
+});
+
+test('loan documents remain visible without a cooperative uploads bucket and beyond the first query page', async () => {
+  const f = setup('super_admin', [Array.from({ length: 100 }, (_, id) => attachment(String(id))), [attachment('last')], []]);
+  documentStorage(f, { missingBucket: true });
+  const rows = await (await f.GET(f.request('documents'))).json();
+  assert.equal(rows.length, 101);
+  assert.deepEqual(f.calls.filter(call => call.table).map(call => call.start), [0, 100, 200]);
+});
+
+test('a missing stored file does not hide other document records', async () => {
+  const f = setup('admin', [[attachment('missing', 'missing.pdf'), attachment('good')], []]);
+  documentStorage(f, { brokenPath: 'missing.pdf' });
+  const response = await f.GET(f.request('documents')); assert.equal(response.status, 200);
+  const rows = await response.json(); assert.equal(rows.length, 3);
+  assert.equal(rows.find(row => row.id === 'loan:missing').url, null);
+  assert.ok(rows.find(row => row.id === 'loan:missing').linkError);
+  assert.ok(rows.find(row => row.id === 'loan:good').url);
+});
+
+test('loan attachment IDs cannot be deleted through the cooperative document endpoint', async () => {
+  const f = setup();
+  assert.equal((await f.DELETE(f.request('documents', 'DELETE', { id: 'loan:one' }))).status, 400);
+  assert.equal(f.calls.length, 0);
+});

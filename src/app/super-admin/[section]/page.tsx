@@ -7,7 +7,6 @@ import ActiveLoansPage from "@/app/(admin)/active-loans/page";
 import NotificationsPage from "@/app/(admin)/notifications/page";
 import AnnouncementsPage from "@/app/(admin)/announcements/page";
 import DocumentsPage from "@/app/(admin)/documents/page";
-import ContentManagerPage from "@/app/(admin)/content-manager/page";
 import ReportsPage from "@/app/(admin)/reports/page";
 import AuditLogsPage from "@/app/(admin)/audit-logs/page";
 import SettingsPage from "@/app/(admin)/settings/page";
@@ -24,7 +23,6 @@ const pages: Record<string, ComponentType> = {
   announcements: AnnouncementsPage,
   "system-management": DocumentsPage,
   documents: DocumentsPage,
-  "content-manager": ContentManagerPage,
   reports: ReportsPage,
   "audit-logs": AuditLogsPage,
   settings: SettingsPage,
