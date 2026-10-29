@@ -5,6 +5,7 @@ import { Bell, CalendarDays, CheckCircle2, Search, Send, Smartphone, X } from "l
 import type { Member } from "@/components/members/MembersData";
 import { fetchAdminAccounts } from "@/lib/adminAccounts";
 import { useSecureAdminAction } from "@/components/auth/SecureAdminActionProvider";
+import { getSupabaseClient } from "@/lib/supabase";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 import NotificationTypePills from "./NotificationTypePills";
 
@@ -15,6 +16,9 @@ const label = "mb-1.5 block text-xs font-semibold text-[#334155]";
 export default function SendNotificationCard({ onRequestCompleted }: { onRequestCompleted?: () => void }) {
   const { role } = useAdminAuth();
   const { beginSecureAction } = useSecureAdminAction();
+  const [deliveryService, setDeliveryService] = useState<{ delivery_enabled: boolean; scheduling_enabled: boolean } | null>(null);
+  const [deliveryError, setDeliveryError] = useState("");
+  useEffect(() => { let active = true; if (role !== "super_admin") return; void getSupabaseClient().rpc("notification_service_status").then(({data,error}) => { if (!active) return; if (error) setDeliveryError("Notification delivery is not configured. Apply the delivery migration and refresh this page."); else setDeliveryService(data); }); return () => { active = false; }; }, [role]);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberError, setMemberError] = useState("");
   const [membersLoading, setMembersLoading] = useState(true);
@@ -52,7 +56,7 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
   const specific = sendTo === "specificMember";
   const recipientCount = specific ? selectedMember ? 1 : 0 : members.length;
   const recipientSummary = specific ? selectedMember ? selectedMember.fullName : "Choose a member" : "All members";
-  const enabled = role === "super_admin" && !membersLoading && !memberError && recipientCount > 0 &&
+  const enabled = deliveryService?.delivery_enabled && role === "super_admin" && !membersLoading && !memberError && recipientCount > 0 &&
     !!title.trim() && !!message.trim() && !pending && !accepted && (delivery === "now" || !!schedule);
   const edited = () => { setAccepted(false); setFormError(""); };
 
@@ -98,6 +102,7 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
       <form onSubmit={submit} className="min-w-0 rounded-[14px] border border-[#E2E8F0] bg-white shadow-sm">
         <div className="border-b border-[#E2E8F0] px-5 py-4"><h2 className="text-base font-semibold text-[#17212F]">Compose Member Notification</h2><p className="mt-1 text-xs leading-5 text-[#64748B]">Send a message to the member mobile application.</p></div>
         <div className="space-y-4 p-5">
+          {deliveryError && <p role="alert" className="text-xs text-red-700">{deliveryError}</p>}
           {memberError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-700">{memberError}<button type="button" onClick={() => { setMembersLoading(true); setMemberError(""); setLoadAttempt((value) => value + 1); }} className="ml-2 font-semibold underline">Retry recipients</button></div>}
           {role !== "super_admin" && <p className="text-xs text-[#64748B]">Sending and scheduling require the existing Super Admin permission.</p>}
           <div><label className={label} htmlFor="notification-recipient">Recipients</label><select id="notification-recipient" value={sendTo} disabled={pending} onChange={(event) => { setSendTo(event.target.value as RecipientTarget); setSelectedMember(null); setMemberSearch(""); edited(); }} className={`${control} h-10`}>
@@ -111,7 +116,7 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
           <fieldset disabled={pending}><legend className={label}>Notification type</legend><NotificationTypePills selectedType={selectedType} onTypeChange={(type) => { setSelectedType(type); edited(); }} /></fieldset>
           <div><label htmlFor="notification-title" className={label}>Title</label><input id="notification-title" required maxLength={200} disabled={pending} value={title} onChange={(event) => { setTitle(event.target.value); edited(); }} placeholder="Enter notification title" className={`${control} h-10`} /></div>
           <div><label htmlFor="notification-message" className={label}>Message</label><textarea id="notification-message" required rows={4} disabled={pending} value={message} onChange={(event) => { setMessage(event.target.value); edited(); }} placeholder="Write your message to members" className={`${control} min-h-28 resize-y py-2`} /></div>
-          <fieldset disabled={pending}><legend className={label}>Delivery</legend><div className="grid grid-cols-1 gap-2 min-[30rem]:grid-cols-2">{(["now", "later"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-xs font-medium ${delivery === value ? "border-[#145B3C] bg-[#F2F8F5] text-[#145B3C]" : "border-[#E2E8F0] text-[#64748B]"}`}><input type="radio" name="notification-delivery" value={value} checked={delivery === value} onChange={() => { setDelivery(value); edited(); }} className="accent-[#145B3C]" />{value === "now" ? "Send Now" : "Schedule for Later"}</label>)}</div></fieldset>
+          <fieldset disabled={pending}><legend className={label}>Delivery</legend><div className="grid grid-cols-1 gap-2 min-[30rem]:grid-cols-2">{(["now", "later"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-xs font-medium ${delivery === value ? "border-[#145B3C] bg-[#F2F8F5] text-[#145B3C]" : "border-[#E2E8F0] text-[#64748B]"}`}><input type="radio" disabled={value === "later" && !deliveryService?.scheduling_enabled} name="notification-delivery" value={value} checked={delivery === value} onChange={() => { setDelivery(value); edited(); }} className="accent-[#145B3C]" />{value === "now" ? "Send Now" : deliveryService?.scheduling_enabled ? "Schedule for Later" : "Scheduling unavailable"}</label>)}</div></fieldset>
           {delivery === "later" && <div><label htmlFor="notification-schedule" className={label}>Schedule date and time</label><input id="notification-schedule" type="datetime-local" required disabled={pending} value={schedule} onChange={(event) => { setSchedule(event.target.value); edited(); }} className={`${control} h-10`} /><p className="mt-1.5 text-xs leading-5 text-[#64748B]">Uses your local time. Scheduled delivery requires the notification service scheduler.</p></div>}
           {formError && <p role="alert" className="text-xs leading-5 text-red-700">{formError}</p>}
           {accepted && <p role="status" className="flex items-start gap-2 rounded-lg bg-[#F2F8F5] p-3 text-xs leading-5 text-[#145B3C]"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />The service returned a response. Check outgoing history for delivery confirmation. Your draft is retained; edit it to submit another request.</p>}

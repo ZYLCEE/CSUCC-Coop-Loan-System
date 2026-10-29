@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import LoanDetailsModal from "../loan-applications/LoanDetailsModal";
 import Link from "next/link";
 import { ArrowRight, FileText, RefreshCw } from "lucide-react";
 import { formatPeso, formatSubmissionDate, type DashboardLoan } from "./dashboard-model";
@@ -25,8 +27,10 @@ interface RecentApplicationsProps {
 export default function RecentApplications({
   applications = [], loading = false, error, applicationsHref = "/loan-applications", onRetry,
 }: RecentApplicationsProps) {
+  const [detailId, setDetailId] = useState<string | null>(null);
   return (
     <section aria-labelledby="recent-applications-heading" aria-busy={loading} className="min-w-0 overflow-hidden rounded-[14px] border border-[#E2E8F0] bg-white shadow-[0_2px_6px_rgba(15,23,42,0.025)]">
+      {detailId && <LoanDetailsModal applicationId={detailId} onClose={() => setDetailId(null)} />}
       <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
         <div>
           <h2 id="recent-applications-heading" className="text-base font-semibold text-[#17212F]">Recent Loan Applications</h2>
@@ -63,7 +67,7 @@ export default function RecentApplications({
                 <td className="whitespace-nowrap px-5 py-3 text-right font-semibold text-[#17212F] tabular-nums">{formatPeso(application.amount)}</td>
                 <td className="whitespace-nowrap px-5 py-3 text-[#64748B]">{formatSubmissionDate(application.submittedAt)}</td>
                 <td className="whitespace-nowrap px-5 py-3"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusStyles[application.status]}`}>{application.status}</span></td>
-                <td className="whitespace-nowrap px-5 py-3"><span title="Application details are not yet available in the existing system."><button type="button" disabled aria-label={`View details for ${application.id} — unavailable`} className="cursor-not-allowed text-xs font-medium text-slate-400">View Details</button></span></td>
+                <td className="whitespace-nowrap px-5 py-3"><button type="button" onClick={() => setDetailId(application.id)} className="text-xs font-medium text-green-800 underline">View Details</button></td>
               </tr>
             ))}
           </tbody>

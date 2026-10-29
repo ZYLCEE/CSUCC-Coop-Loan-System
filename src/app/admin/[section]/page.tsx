@@ -18,6 +18,7 @@ const pages: Record<string, ComponentType> = {
   dashboard: DashboardPage,
   "loan-applications": LoanApplicationsPage,
   "all-accounts": MembersPage,
+  members: MembersPage,
   "active-loans": ActiveLoansPage,
   communication: NotificationsPage,
   notifications: NotificationsPage,

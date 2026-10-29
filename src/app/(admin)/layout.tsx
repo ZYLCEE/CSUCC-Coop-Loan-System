@@ -12,7 +12,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
   return (
     <main className={`transition-all duration-300 ${
       isCollapsed ? "ml-[76px]" : "ml-64"
-    } mt-[72px] px-9 py-7`}>
+    } mt-[72px] min-w-0 px-4 py-6 sm:px-6 xl:px-9`}>
       {children}
     </main>
   );
@@ -27,7 +27,7 @@ export default function AdminLayout({
     <AdminAuthProvider>
       <SecureAdminActionProvider>
         <SidebarProvider>
-          <div className="min-h-screen bg-[#F5F6F8]">
+          <div className="portal-shell min-h-screen bg-[#F5F6F8]">
             <Sidebar />
             <Navbar />
             <AdminContent>{children}</AdminContent>

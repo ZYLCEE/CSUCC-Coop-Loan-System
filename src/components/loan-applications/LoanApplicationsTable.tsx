@@ -6,6 +6,7 @@ import { LoanApplication } from "@/lib/api";
 import MembersPagination from "@/components/members/MembersPagination";
 import MembershipTypeBadge from "@/components/shared/MembershipTypeBadge";
 import { useSecureAdminAction } from "@/components/auth/SecureAdminActionProvider";
+import LoanDetailsModal from "./LoanDetailsModal";
 import LoanDocumentsModal from "./LoanDocumentsModal";
 
 interface LoanApplicationsTableProps {
@@ -76,6 +77,7 @@ export default function LoanApplicationsTable({
   onPageChange,
   onApplicationUpdated,
 }: LoanApplicationsTableProps) {
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<ActionMenuState | null>(null);
   const [documentApplicationId, setDocumentApplicationId] = useState<string | null>(null);
   const { beginSecureAction } = useSecureAdminAction();
@@ -183,11 +185,12 @@ export default function LoanApplicationsTable({
       return;
     }
 
-    window.alert(`Frontend only: ${action} for ${application.id}.`);
+    setDetailId(application.id);
   };
 
   return (
     <div className="relative">
+      {detailId && <LoanDetailsModal applicationId={detailId} onClose={() => setDetailId(null)} />}
       {documentApplicationId && <LoanDocumentsModal key={documentApplicationId} applicationId={documentApplicationId} onClose={() => setDocumentApplicationId(null)} />}
       <div className="overflow-x-auto border-t border-[#E5E7EB]">
         <table className="w-full min-w-[1000px] table-fixed">

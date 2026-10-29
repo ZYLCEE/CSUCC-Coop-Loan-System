@@ -24,3 +24,21 @@ body {
   color: var(--foreground);
   font-family: var(--font-inter), Arial, Helvetica, sans-serif;
 }
+
+/* The administrative portal uses light surfaces independently of device theme. */
+.portal-shell {
+  color: #0f172a;
+  color-scheme: light;
+}
+
+.portal-shell input::placeholder,
+.portal-shell textarea::placeholder {
+  color: #64748b;
+  opacity: 1;
+}
+
+.portal-shell input,
+.portal-shell select,
+.portal-shell textarea {
+  background-color: #fff;
+}

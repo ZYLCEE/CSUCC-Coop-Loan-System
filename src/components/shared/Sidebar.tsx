@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSidebar } from "@/contexts/SidebarContext";
@@ -23,6 +23,7 @@ import {
   Menu,
   type LucideIcon,
 } from "lucide-react";
+import { adminRequest } from "@/lib/adminRequest";
 import styles from "./Sidebar.module.css";
 
 type NavItem = {
@@ -80,6 +81,14 @@ function createNavGroups(prefix: string): NavSection[] {
 }
 
 export default function Sidebar() {
+  const [cooperativeName, setCooperativeName] = useState("CSUCC MPC");
+  useEffect(() => {
+    let active = true;
+    void adminRequest("general").then(data => { if (active && data.cooperativeName) setCooperativeName(data.cooperativeName); }).catch(() => {});
+    const changed = (event: Event) => setCooperativeName((event as CustomEvent).detail.cooperativeName);
+    window.addEventListener("coop-settings-changed", changed);
+    return () => { active = false; window.removeEventListener("coop-settings-changed", changed); };
+  }, []);
   const pathname = usePathname();
   const { isCollapsed, toggleSidebar } = useSidebar();
   const { user, signOut } = useAdminAuth();
@@ -104,8 +113,8 @@ export default function Sidebar() {
     >
       <div className={`${styles.header} flex shrink-0 items-center border-b border-white/10 ${isCollapsed ? "justify-center px-0" : "justify-between px-4"}`}>
         {!isCollapsed && (
-          <h1 className="whitespace-nowrap text-xs font-bold uppercase leading-none tracking-[4px] text-[#E7C84B]">
-            CSUCC MPC
+          <h1 title={cooperativeName} className="truncate text-xs font-bold uppercase leading-none tracking-wide text-[#E7C84B]">
+            {cooperativeName}
           </h1>
         )}
         <button

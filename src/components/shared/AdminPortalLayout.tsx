@@ -11,7 +11,7 @@ function PortalContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
   return (
     <main
-      className={`mt-[72px] px-9 py-7 transition-all duration-300 ${
+      className={`mt-[72px] min-w-0 px-4 py-6 sm:px-6 xl:px-9 transition-all duration-300 ${
         isCollapsed ? "ml-[76px]" : "ml-64"
       }`}
     >
@@ -31,7 +31,7 @@ export default function AdminPortalLayout({
     <AdminAuthProvider requiredRole={role}>
       <SecureAdminActionProvider enabled={role === "super_admin"}>
         <SidebarProvider>
-          <div className="min-h-screen bg-[#F5F6F8]">
+          <div className="portal-shell min-h-screen bg-[#F5F6F8]">
             <Sidebar />
             <Navbar />
             <PortalContent>{children}</PortalContent>
