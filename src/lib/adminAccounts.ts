@@ -148,7 +148,18 @@ async function getInvokeFailure(invokeError: unknown): Promise<AdminAccountLoadE
   );
 }
 
-export async function fetchAdminAccounts(): Promise<{
+// Share in-flight loads (including React's development effect replay) so a
+// rejected token triggers only one refresh/retry sequence.
+let pendingAccounts: ReturnType<typeof loadAdminAccounts> | null = null;
+
+export function fetchAdminAccounts() {
+  if (!pendingAccounts) {
+    pendingAccounts = loadAdminAccounts().finally(() => { pendingAccounts = null; });
+  }
+  return pendingAccounts;
+}
+
+async function loadAdminAccounts(): Promise<{
   accounts: Member[];
   dataIntegrityIssues: number;
 }> {
@@ -173,9 +184,27 @@ export async function fetchAdminAccounts(): Promise<{
     if (failure.code !== "session_expired") throw failure;
 
     const { data: refreshed, error: refreshError } = await client.auth.refreshSession();
+    if (refreshError && refreshError.status !== 400 && refreshError.status !== 401 && refreshError.status !== 403) {
+      throw new AdminAccountLoadError(
+        "Unable to refresh your session. Check your connection and retry.",
+        "network_failure",
+      );
+    }
     if (refreshError || !refreshed.session) throw failure;
     ({ data, error } = await invoke(refreshed.session.access_token));
-    if (error) throw await getInvokeFailure(error);
+    if (error) {
+      const retryFailure = await getInvokeFailure(error);
+      if (retryFailure.code === "session_expired") {
+        const validation = await client.auth.getUser(refreshed.session.access_token);
+        if (!validation.error && validation.data.user) {
+          throw new AdminAccountLoadError(
+            "Your session is valid, but the account service rejected it. Retry or contact the system administrator.",
+            "service_auth_failure",
+          );
+        }
+      }
+      throw retryFailure;
+    }
   }
 
   if (

@@ -8,6 +8,7 @@ import MembershipTypeBadge from "@/components/shared/MembershipTypeBadge";
 import { useSecureAdminAction } from "@/components/auth/SecureAdminActionProvider";
 import LoanDetailsModal from "./LoanDetailsModal";
 import LoanDocumentsModal from "./LoanDocumentsModal";
+import LoanReleaseDialog from "./LoanReleaseDialog";
 
 interface LoanApplicationsTableProps {
   applications: LoanApplication[];
@@ -80,6 +81,7 @@ export default function LoanApplicationsTable({
   const [detailId, setDetailId] = useState<string | null>(null);
   const [openMenu, setOpenMenu] = useState<ActionMenuState | null>(null);
   const [documentApplicationId, setDocumentApplicationId] = useState<string | null>(null);
+  const [releaseApplicationId, setReleaseApplicationId] = useState<string | null>(null);
   const { beginSecureAction } = useSecureAdminAction();
   const menuRef = useRef<HTMLDivElement>(null);
   const selectedApplication = openMenu
@@ -141,6 +143,10 @@ export default function LoanApplicationsTable({
 
   const handleMenuAction = (action: string, application: LoanApplication) => {
     setOpenMenu(null);
+    if (action === "release loan" && !readOnly && application.status === "Approved") {
+      setReleaseApplicationId(application.id);
+      return;
+    }
     if (action === "view documents") {
       setDocumentApplicationId(application.id);
       return;
@@ -191,6 +197,7 @@ export default function LoanApplicationsTable({
   return (
     <div className="relative">
       {detailId && <LoanDetailsModal applicationId={detailId} onClose={() => setDetailId(null)} />}
+      {releaseApplicationId && <LoanReleaseDialog key={releaseApplicationId} applicationId={releaseApplicationId} onClose={() => setReleaseApplicationId(null)} onReleased={onApplicationUpdated} />}
       {documentApplicationId && <LoanDocumentsModal key={documentApplicationId} applicationId={documentApplicationId} onClose={() => setDocumentApplicationId(null)} />}
       <div className="overflow-x-auto border-t border-[#E5E7EB]">
         <table className="w-full min-w-[1000px] table-fixed">
@@ -331,6 +338,15 @@ export default function LoanApplicationsTable({
             <Eye className="h-4 w-4" />
             View Details
           </button>
+          {!readOnly && selectedApplication.status === "Approved" && <button
+            type="button"
+            onClick={() => handleMenuAction("release loan", selectedApplication)}
+            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-medium text-[#047857] transition-colors hover:bg-[#ECFDF5]"
+            role="menuitem"
+          >
+            <CheckCircle2 className="h-4 w-4" />
+            Mark as Released
+          </button>}
           {!readOnly &&
             (selectedApplication.status === "Pending" ||
             selectedApplication.status === "Under Review") && (

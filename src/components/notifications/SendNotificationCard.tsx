@@ -30,7 +30,7 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
       memberRequest.current = { attempt: loadAttempt, promise: fetchAdminAccounts() };
     }
     void memberRequest.current.promise.then(({ accounts }) => {
-      if (active) setMembers(accounts.filter((account) => account.role === "Member" && account.profileLinked && account.authUserId));
+      if (active) setMembers(accounts.filter((account) => account.role === "Member" && account.status === "Active" && account.profileLinked && account.authUserId));
     }).catch(() => {
       if (active) setMemberError("Unable to load member recipients. Check your connection and retry.");
     }).finally(() => { if (active) setMembersLoading(false); });
@@ -115,7 +115,7 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
           </div>}
           <fieldset disabled={pending}><legend className={label}>Notification type</legend><NotificationTypePills selectedType={selectedType} onTypeChange={(type) => { setSelectedType(type); edited(); }} /></fieldset>
           <div><label htmlFor="notification-title" className={label}>Title</label><input id="notification-title" required maxLength={200} disabled={pending} value={title} onChange={(event) => { setTitle(event.target.value); edited(); }} placeholder="Enter notification title" className={`${control} h-10`} /></div>
-          <div><label htmlFor="notification-message" className={label}>Message</label><textarea id="notification-message" required rows={4} disabled={pending} value={message} onChange={(event) => { setMessage(event.target.value); edited(); }} placeholder="Write your message to members" className={`${control} min-h-28 resize-y py-2`} /></div>
+          <div><label htmlFor="notification-message" className={label}>Message</label><textarea id="notification-message" required maxLength={10000} rows={4} disabled={pending} value={message} onChange={(event) => { setMessage(event.target.value); edited(); }} placeholder="Write your message to members" className={`${control} min-h-28 resize-y py-2`} /></div>
           <fieldset disabled={pending}><legend className={label}>Delivery</legend><div className="grid grid-cols-1 gap-2 min-[30rem]:grid-cols-2">{(["now", "later"] as const).map((value) => <label key={value} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 text-xs font-medium ${delivery === value ? "border-[#145B3C] bg-[#F2F8F5] text-[#145B3C]" : "border-[#E2E8F0] text-[#64748B]"}`}><input type="radio" disabled={value === "later" && !deliveryService?.scheduling_enabled} name="notification-delivery" value={value} checked={delivery === value} onChange={() => { setDelivery(value); edited(); }} className="accent-[#145B3C]" />{value === "now" ? "Send Now" : deliveryService?.scheduling_enabled ? "Schedule for Later" : "Scheduling unavailable"}</label>)}</div></fieldset>
           {delivery === "later" && <div><label htmlFor="notification-schedule" className={label}>Schedule date and time</label><input id="notification-schedule" type="datetime-local" required disabled={pending} value={schedule} onChange={(event) => { setSchedule(event.target.value); edited(); }} className={`${control} h-10`} /><p className="mt-1.5 text-xs leading-5 text-[#64748B]">Uses your local time. Scheduled delivery requires the notification service scheduler.</p></div>}
           {formError && <p role="alert" className="text-xs leading-5 text-red-700">{formError}</p>}

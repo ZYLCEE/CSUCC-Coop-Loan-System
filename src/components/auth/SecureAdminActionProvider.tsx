@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 import { Eye, EyeOff, LoaderCircle, ShieldCheck, X } from "lucide-react";
-import { getSupabaseClient } from "@/lib/supabase";
+import { invokeProtectedAction } from "@/lib/protectedAction";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 
 export interface SecureActionRequest {
@@ -139,19 +139,14 @@ export function SecureAdminActionProvider({
     setError("");
 
     try {
-      const { data, error: invokeError } = await getSupabaseClient().functions.invoke(
-        "secure-admin-action",
-        {
-          body: {
-            mode: "verify",
-            action: request.action,
-            target: request.target,
-            payload: request.payload,
-            secret: request.secret,
-            password: securityPassword,
-          },
-        }
-      );
+      const { data, error: invokeError } = await invokeProtectedAction({
+        mode: "verify",
+        action: request.action,
+        target: request.target,
+        payload: request.payload,
+        secret: request.secret,
+        password: securityPassword,
+      });
 
       if (invokeError || !data?.grant) {
         setError(
@@ -188,19 +183,14 @@ export function SecureAdminActionProvider({
     setError("");
 
     try {
-      const { data, error: invokeError } = await getSupabaseClient().functions.invoke(
-        "secure-admin-action",
-        {
-          body: {
-            mode: "execute",
-            action: request.action,
-            target: request.target,
-            payload: request.payload,
-            secret: request.secret,
-            grant,
-          },
-        }
-      );
+      const { data, error: invokeError } = await invokeProtectedAction({
+        mode: "execute",
+        action: request.action,
+        target: request.target,
+        payload: request.payload,
+        secret: request.secret,
+        grant,
+      });
 
       if (invokeError || data?.success !== true) {
         const failureMessage = await getInvokeError(

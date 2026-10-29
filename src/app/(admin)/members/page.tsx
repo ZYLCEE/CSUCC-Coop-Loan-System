@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import MemberToolbar from "@/components/members/MemberToolbar";
 import MembersTable from "@/components/members/MembersTable";
 import MemberDetailsModal from "@/components/members/MemberDetailsModal";
@@ -15,7 +16,7 @@ import {
   MembershipTypeFilter,
   getMembershipTypeLabel,
 } from "@/lib/membership";
-import { fetchAdminAccounts } from "@/lib/adminAccounts";
+import { AdminAccountLoadError, fetchAdminAccounts } from "@/lib/adminAccounts";
 import { useSecureAdminAction } from "@/components/auth/SecureAdminActionProvider";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 
@@ -33,6 +34,7 @@ export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [membersLoading, setMembersLoading] = useState(true);
   const [membersError, setMembersError] = useState("");
+  const [sessionExpired, setSessionExpired] = useState(false);
   const [dataIntegrityIssues, setDataIntegrityIssues] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [memberIdInput, setMemberIdInput] = useState("");
@@ -58,12 +60,15 @@ export default function MembersPage() {
   const loadMembers = useCallback(async () => {
     setMembersLoading(true);
     setMembersError("");
+    setSessionExpired(false);
     try {
       const result = await fetchAdminAccounts();
       setMembers(result.accounts);
       setDataIntegrityIssues(result.dataIntegrityIssues);
     } catch (error) {
-      console.error("Failed to load member accounts:", error);
+      setMembers([]);
+      setDataIntegrityIssues(0);
+      setSessionExpired(error instanceof AdminAccountLoadError && error.code === "session_expired");
       setMembersError(
         error instanceof Error
           ? error.message
@@ -91,8 +96,10 @@ export default function MembersPage() {
         }
       })
       .catch((error: unknown) => {
-        console.error("Failed to load member accounts:", error);
         if (isActive) {
+          setMembers([]);
+          setDataIntegrityIssues(0);
+          setSessionExpired(error instanceof AdminAccountLoadError && error.code === "session_expired");
           setMembersError(
             error instanceof Error
               ? error.message
@@ -349,6 +356,7 @@ export default function MembersPage() {
         {membersError ? (
           <div role="alert" className="border-t border-[#E5E7EB] px-4 py-8 text-center text-sm font-medium text-[#B91C1C]">
             {membersError}
+            {sessionExpired && <Link href="/login" className="ml-2 font-semibold underline">Sign in again</Link>}
             <button
               type="button"
               onClick={refreshMembers}
