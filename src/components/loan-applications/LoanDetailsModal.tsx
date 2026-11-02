@@ -1,4 +1,6 @@
 "use client";
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
+import { Files, History, X } from "lucide-react";
 import { useEffect, useState } from 'react';
 import { getSupabaseClient } from '@/lib/supabase';
 import LoanDocumentsModal from './LoanDocumentsModal';
@@ -26,14 +28,14 @@ export default function LoanDetailsModal({ applicationId, onClose }: { applicati
   }, [applicationId, onClose, paymentOpen]);
   return <div role="dialog" aria-modal="true" aria-label={`Loan ${applicationId}`} className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
     <section className="max-h-[90vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-6 shadow-xl" onClick={event => event.stopPropagation()}>
-      <div className="mb-4 flex justify-between"><h2 className="font-bold">{applicationId}</h2><button autoFocus onClick={onClose}>Close</button></div>
+      <div className="mb-4 flex justify-between"><h2 className="font-bold">{applicationId}</h2><button type="button" autoFocus onClick={onClose} className={actionButtonStyles()}><X className="h-4 w-4" aria-hidden="true" />Close</button></div>
       {error ? <p role="alert">{error}</p> : !record ? <p>Loading loan…</p> : <>
         <dl className="grid grid-cols-2 gap-3 text-sm">{Object.entries(record).filter(([key]) => !['id','member_id'].includes(key)).map(([key, value]) => <div key={key}><dt className="text-slate-500">{key.replaceAll('_',' ')}</dt><dd className="break-words">{value == null ? 'Not recorded' : String(value)}</dd></div>)}</dl>
         <h3 className="mt-5 font-semibold">Payment history</h3>
         {payments.slice(0,10).map(payment => <p key={String(payment.id)} className="mt-2 text-sm">{String(payment.payment_date)} — ₱{Number(payment.payment_amount).toLocaleString('en-PH')} · {String(payment.payment_method ?? 'Not recorded').replaceAll('_',' ')} · {String(payment.receipt_number ?? 'Legacy receipt')} · {String(payment.payment_status ?? 'posted')}</p>)}
         {!payments.length && <p className="text-sm text-slate-500">No payments recorded.</p>}
-        <button className="mt-3 text-sm font-semibold text-green-800 underline" onClick={() => setPaymentOpen(true)}>Open payment history / record payment</button>
-        <button className="mt-5 rounded bg-green-800 px-4 py-2 text-white" onClick={() => setDocuments(true)}>View documents</button>
+        <div className="mt-5 flex flex-wrap gap-2 border-t border-slate-100 pt-4"><button type="button" className={actionButtonStyles("primary")} onClick={() => setPaymentOpen(true)}><History className="h-4 w-4" aria-hidden="true" />Open payment history / record payment</button>
+        <button type="button" className={actionButtonStyles()} onClick={() => setDocuments(true)}><Files className="h-4 w-4" aria-hidden="true" />View documents</button></div>
       </>}
       {documents && <LoanDocumentsModal applicationId={applicationId} onClose={() => setDocuments(false)} />}
       {paymentOpen && record && <CounterPaymentDialog loanId={String(record.id)} onClose={() => setPaymentOpen(false)} />}

@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useCallback, useEffect, useState } from "react";
 import { fetchLoanPolicy, LoanPolicy as LoanPolicyData } from "@/lib/loanPolicy";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
@@ -100,7 +101,7 @@ export default function LoanPolicy() {
     <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div><h2 className="text-[16px] font-bold text-[#111827]">Loan Policy Settings</h2><p className="mt-1 text-xs text-[#64748B]">Stored in Supabase. Saving requires your Super Admin password and confirmation.</p></div>
-        <button type="button" onClick={() => void loadPolicy()} disabled={loading || saving} className="text-sm font-semibold text-[#155D3B] underline disabled:opacity-50">Reload</button>
+        <button type="button" onClick={() => void loadPolicy()} disabled={loading || saving} className={actionButtonStyles()}>Reload</button>
       </div>
       {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
       {notice && <p role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{notice}</p>}

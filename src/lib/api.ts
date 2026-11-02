@@ -157,6 +157,7 @@ export async function fetchLoanApplications(): Promise<LoanApplication[]> {
   const { data, error } = await getSupabaseClient()
     .from("loan_applications")
     .select(loanApplicationSelect)
+    .in("status", ["pending", "under review", "approved", "rejected"])
     .order("date_submitted", { ascending: false });
   if (error) {
     throw error;

@@ -3,13 +3,14 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import ts from 'typescript';
+import * as privilegesModule from '../../../../lib/adminPrivileges.ts';
 const require = createRequire(import.meta.url);
 const code = ts.transpileModule(readFileSync(new URL('./route.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const payload = { title: 'Test', message: 'Isolated test message', type: 'Information', sendTo: 'allMembers', recipientCount: 5000, recipientSummary: '5000 members', scheduledAt: null, memberId: null };
 const base = { action: 'send-notification', target: 'allMembers', payload };
-function setup({ role = 'super_admin', status = 'active', passwordValid = true, passwordStatus = 401, insertError = null, noRecipients = false } = {}) {
+function setup({ role = 'super_admin', status = 'active', privileges = [], passwordValid = true, passwordStatus = 401, insertError = null, noRecipients = false } = {}) {
   const calls = [], rows = new Map(); let pending = null;
-  const user = role ? { id: 'admin-id', email: 'admin@test.invalid', app_metadata: { role, account_status: status } } : null;
+  const user = role ? { id: 'admin-id', email: 'admin@test.invalid', app_metadata: { role, account_status: status, admin_privileges: privileges } } : null;
   const client = {
     auth: {
       getUser: async () => ({ data: { user }, error: null }),
@@ -30,15 +31,27 @@ function setup({ role = 'super_admin', status = 'active', passwordValid = true, 
     },
   };
   const exports = {};
-  new Function('require', 'exports', 'process', code)(name => name === '@supabase/supabase-js' ? { createClient: () => client } : require(name), exports, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://project.test', SUPABASE_SERVICE_ROLE_KEY: 'only-a-test-signing-key', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon' } });
+  new Function('require', 'exports', 'process', code)(name => name === '@/lib/adminPrivileges' ? privilegesModule : name === '@supabase/supabase-js' ? { createClient: () => client } : require(name), exports, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://project.test', SUPABASE_SERVICE_ROLE_KEY: 'only-a-test-signing-key', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon' } });
   const send = body => exports.POST(new Request('http://localhost/api/admin/notifications', { method: 'POST', headers: { Authorization: 'Bearer session', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
   const verify = async (body = base) => { const response = await send({ ...body, mode: 'verify', password: 'test-only-password' }); assert.equal(response.status, 200); return (await response.json()).grant; };
-  return { ...exports, send, verify, calls, rows };
+  return { ...exports, send, verify, calls, rows, user };
 }
 test('password verification is separate from delivery and creates no messages', async () => {
   const f = setup(); const grant = await f.verify(); assert.ok(grant);
   assert.equal(f.rows.size, 0); assert.equal(f.calls.filter(call => call.insert).length, 0);
   assert.deepEqual(f.calls[1], { signOut: { scope: 'local' } });
+});
+
+test('assigned admins can send after verification, and revocation is checked before execution', async () => {
+  const f = setup({ role: 'admin', privileges: ['notifications.send'] });
+  const grant = await f.verify();
+  assert.equal((await f.send({ ...base, mode: 'execute', grant })).status, 200);
+  const second = setup({ role: 'admin', privileges: ['notifications.send'] });
+  const revokedGrant = await second.verify(); second.user.app_metadata.admin_privileges = [];
+  assert.equal((await second.send({ ...base, mode: 'execute', grant: revokedGrant })).status, 403);
+  assert.equal(second.rows.size, 0);
+  const schedule = { ...base, action: 'schedule-notification', payload: { ...payload, scheduledAt: '2099-01-01T00:00:00Z' } };
+  assert.equal((await f.send({ ...schedule, mode: 'verify', password: 'test-only' })).status, 403);
 });
 test('only active Super Admin users can verify or execute; wrong passwords fail closed', async () => {
   for (const options of [{ role: null }, { role: 'admin' }, { role: 'member' }, { status: 'blocked' }, { status: 'inactive' }]) {

@@ -29,7 +29,7 @@ export default function AdminPortalLayout({
 }) {
   return (
     <AdminAuthProvider requiredRole={role}>
-      <SecureAdminActionProvider enabled={role === "super_admin"}>
+      <SecureAdminActionProvider>
         <SidebarProvider>
           <div className="portal-shell min-h-screen bg-[#F5F6F8]">
             <Sidebar />

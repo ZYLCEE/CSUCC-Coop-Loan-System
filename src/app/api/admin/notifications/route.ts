@@ -1,5 +1,6 @@
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
+import { hasAdminPrivilege } from '@/lib/adminPrivileges';
 
 export const runtime = 'nodejs';
 const types: Record<string, string> = { Information: 'info', Reminder: 'warning', Approval: 'loan_approval', Rejection: 'loan_rejection', Maintenance: 'warning', Emergency: 'error' };
@@ -40,6 +41,22 @@ function readGrant(value: unknown, key: string): Grant | null {
   } catch { return null; }
 }
 
+export async function GET(request: Request) {
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!url || !key) return fail('Notification configuration is missing.', 503);
+    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
+    if (!token) return fail('Sign in again.', 401);
+    const { data: { user }, error } = await client.auth.getUser(token);
+    if (error || !user) return fail('Your session expired.', 401);
+    if (!hasAdminPrivilege(user, 'notifications.send')) return fail('Notification sending permission is required.', 403);
+    const schema = await client.from('notifications').select('id,send_to,recipient_count,status').limit(0);
+    if (schema.error) return fail('Notification delivery is unavailable.', 503);
+    return reply({ delivery_enabled: true, scheduling_enabled: false });
+  } catch { return fail('Notification delivery is unavailable.', 503); }
+}
+
 export async function POST(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -49,12 +66,13 @@ export async function POST(request: Request) {
     if (!token) return fail('Sign in again to continue.', 401);
     const { data: { user }, error: userError } = await client.auth.getUser(token);
     if (userError || !user) return fail('Your session expired. Sign in again.', 401);
-    if (user.app_metadata.role !== 'super_admin' || (user.app_metadata.account_status && user.app_metadata.account_status !== 'active') || ('banned_until' in user && typeof user.banned_until === 'string' && Date.parse(user.banned_until) > Date.now())) return fail('Active Super Admin access required.', 403);
+    if (!hasAdminPrivilege(user, 'notifications.send')) return fail('Notification sending permission is required.', 403);
     const raw = await request.text();
     if (raw.length > 40000) return fail('Notification request is too large.');
     let body: unknown;
     try { body = JSON.parse(raw); } catch { return fail('Invalid notification request.'); }
     if (!record(body) || !['verify', 'execute'].includes(String(body.mode))) return fail('Invalid notification request.');
+    if (body.action === 'schedule-notification' && user.app_metadata.role !== 'super_admin') return fail('Scheduled notifications require Super Admin access.', 403);
     const payload = normalize(body), digest = fingerprint(body, payload);
     if (body.mode === 'verify') {
       if (!user.email || typeof body.password !== 'string' || !body.password || body.password.length > 1024) return fail('Enter your account password.');

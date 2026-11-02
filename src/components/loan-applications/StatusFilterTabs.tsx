@@ -4,9 +4,6 @@ export const loanStatusTabs = [
   "Under Review",
   "Approved",
   "Rejected",
-  "Released",
-  "Completed",
-  "Overdue",
 ] as const;
 
 interface StatusFilterTabsProps {

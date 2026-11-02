@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useEffect, useState } from "react";
 import { X, ExternalLink } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
@@ -57,18 +58,18 @@ export default function LoanDocumentsModal({ applicationId, onClose }: { applica
       <section role="dialog" aria-modal="true" aria-labelledby="loan-documents-title" onClick={(event) => event.stopPropagation()} className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
         <header className="mb-4 flex items-center justify-between gap-4">
           <div><h2 id="loan-documents-title" className="text-lg font-bold">Application Documents</h2><p className="text-sm text-slate-500">{applicationId}</p></div>
-          <button type="button" aria-label="Close documents" onClick={onClose}><X className="h-5 w-5" /></button>
+          <button type="button" aria-label="Close documents" className={actionButtonStyles()} onClick={onClose}><X className="h-5 w-5" /></button>
         </header>
         {loading ? <p role="status">Loading documents...</p> : error ? <p role="alert" className="text-red-700">{error}</p> : documents.length === 0 ? <p className="text-slate-500">No documents are attached to this application.</p> : (
           <ul className="space-y-3">{documents.map((document) => (
             <li key={document.id} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-3">
               <div className="min-w-0"><p className="font-semibold">{labels[document.kind] ?? document.kind}</p><p className="break-all text-sm text-slate-600">{document.original_name}</p><p className="text-xs text-slate-500">{(document.size_bytes / 1024).toFixed(1)} KB</p></div>
-              <a href={document.url} target="_blank" rel="noopener noreferrer" className="inline-flex shrink-0 items-center gap-1 text-sm font-semibold text-[#155D3B]">Open <ExternalLink className="h-4 w-4" /></a>
+              <a href={document.url} target="_blank" rel="noopener noreferrer" className={actionButtonStyles()}>Open <ExternalLink className="h-4 w-4" /></a>
             </li>
           ))}</ul>
         )}
         <p className="mt-4 text-xs text-slate-500">Document links expire after 5 minutes.</p>
-        <button type="button" className="mt-3 text-sm font-semibold text-[#155D3B] underline" disabled={loading} onClick={() => { setLoading(true); setError(""); setAttempt((value) => value + 1); }}>Refresh documents</button>
+        <button type="button" className={`mt-3 ${actionButtonStyles()}`} disabled={loading} onClick={() => { setLoading(true); setError(""); setAttempt((value) => value + 1); }}>Refresh documents</button>
       </section>
     </div>
   );

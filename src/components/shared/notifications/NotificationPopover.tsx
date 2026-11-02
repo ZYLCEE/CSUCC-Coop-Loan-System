@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
@@ -134,7 +135,7 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
               <div role="group" aria-label="Notification filters" className="flex gap-1 rounded-lg bg-[#F4F6F8] p-0.5">
                 {(expanded ? (["all", "unread", "read"] as const) : (["all", "unread"] as const)).map((filter) => <button key={filter} type="button" aria-pressed={inbox.filter === filter} disabled={inbox.busy} onClick={() => inbox.changeFilter(filter)} className={`rounded-md px-3 py-1 text-xs font-medium disabled:opacity-50 ${inbox.filter === filter ? "bg-white text-[#145B3C] shadow-sm" : "text-[#64748B] hover:text-[#145B3C]"} ${focusStyle}`}>{filter === "all" ? "All" : filter === "unread" ? "Unread" : "Read"}</button>)}
               </div>
-              <button type="button" disabled={inbox.loading || inbox.busy || !inbox.unreadCount || !!inbox.error} onClick={() => void inbox.markRead()} className={`inline-flex items-center gap-1 rounded px-1 py-1 text-[11px] font-semibold text-[#145B3C] hover:underline disabled:cursor-not-allowed disabled:opacity-40 disabled:no-underline ${focusStyle}`}><CheckCheck className="h-3.5 w-3.5" aria-hidden="true" />Mark all as read</button>
+              <button type="button" disabled={inbox.loading || inbox.busy || !inbox.unreadCount || !!inbox.error} onClick={() => void inbox.markRead()} className={actionButtonStyles("secondary", "xs")}><CheckCheck className="h-3.5 w-3.5" aria-hidden="true" />Mark all as read</button>
             </div>
           </div>
           {expanded && <form onSubmit={(event) => { event.preventDefault(); inbox.changeQuery({ search: searchDraft }); }} className="flex shrink-0 flex-wrap gap-2 border-b border-[#E2E8F0] px-4 py-3">
@@ -169,7 +170,7 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
                       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
                         <time dateTime={notification.createdAt} title={new Date(notification.createdAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" })} className="text-[10px] text-[#64748B]">{notificationRelativeTime(notification.createdAt, now)}</time>
                         {notification.read && <span className="text-[10px] text-[#64748B]">Read</span>}
-                        {!notification.read && <button type="button" disabled={inbox.busy} onClick={() => void inbox.markRead(notification.id)} aria-label={`Mark ${notification.title} as read`} className={`inline-flex items-center gap-1 rounded text-[10px] font-semibold text-[#145B3C] hover:underline disabled:opacity-40 ${focusStyle}`}><Check className="h-3 w-3" aria-hidden="true" />Mark as read</button>}
+                        {!notification.read && <button type="button" disabled={inbox.busy} onClick={() => void inbox.markRead(notification.id)} aria-label={`Mark ${notification.title} as read`} className={actionButtonStyles("secondary", "xs")}><Check className="h-3 w-3" aria-hidden="true" />Mark as read</button>}
                       </div>
                     </div>
                   </div>
@@ -178,8 +179,8 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
             {!inbox.loading && !inbox.error && inbox.hasMore && <div className="px-4 py-3 text-center"><button type="button" disabled={inbox.loadingMore || inbox.busy} onClick={() => void inbox.loadMore()} className={`rounded px-3 py-1.5 text-xs font-semibold text-[#145B3C] hover:bg-slate-50 disabled:opacity-50 ${focusStyle}`}>{inbox.loadingMore ? "Loading…" : "Load more notifications"}</button></div>}
           </div>
           <div className="flex shrink-0 items-center justify-center gap-3 border-t border-[#E2E8F0] px-4 py-3">
-            {expanded ? <><button type="button" onClick={backToRecent} className={`mr-auto inline-flex items-center gap-1.5 rounded text-xs font-semibold text-[#145B3C] hover:underline ${focusStyle}`}><ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />Back to Recent</button><span className="text-[11px] text-[#64748B]">{inbox.total === null ? "History unavailable" : `${inbox.items.length} of ${inbox.total} alerts`}</span></>
-              : <button type="button" onClick={expandCenter} className={`rounded text-xs font-semibold text-[#145B3C] hover:underline ${focusStyle}`}>View All Notifications</button>}
+            {expanded ? <><button type="button" onClick={backToRecent} className={`mr-auto ${actionButtonStyles("secondary", "xs")}`}><ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />Back to Recent</button><span className="text-[11px] text-[#64748B]">{inbox.total === null ? "History unavailable" : `${inbox.items.length} of ${inbox.total} alerts`}</span></>
+              : <button type="button" onClick={expandCenter} className={actionButtonStyles("secondary", "xs")}>View All Notifications</button>}
           </div>
         </div></>, document.body,
       )}

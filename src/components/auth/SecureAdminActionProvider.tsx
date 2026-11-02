@@ -43,7 +43,7 @@ export function SecureAdminActionProvider({
   children: ReactNode;
   enabled?: boolean;
 }) {
-  const { role } = useAdminAuth();
+  const { role, can } = useAdminAuth();
   const [request, setRequest] = useState<SecureActionRequest | null>(null);
   const [stage, setStage] = useState<WorkflowStage>("security");
   const [grant, setGrant] = useState<string | null>(null);
@@ -58,7 +58,7 @@ export function SecureAdminActionProvider({
   const busyRef = useRef(false);
 
   const beginSecureAction = (nextRequest: SecureActionRequest) => {
-    if (!enabled || role !== "super_admin") {
+    if (!enabled || (role !== "super_admin" && !(nextRequest.action === "send-notification" && can("notifications.send")))) {
       return;
     }
     if (busyRef.current || request) {
@@ -245,7 +245,7 @@ export function SecureAdminActionProvider({
   return (
     <SecureAdminActionContext.Provider value={{ beginSecureAction }}>
       {children}
-      {enabled && role === "super_admin" && request && (
+      {enabled && request && (role === "super_admin" || (request.action === "send-notification" && can("notifications.send"))) && (
         <div
           className="fixed inset-0 z-[110] flex items-center justify-center bg-[#111827]/50 p-4"
           role="presentation"

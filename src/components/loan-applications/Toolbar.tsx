@@ -42,9 +42,6 @@ const statusOptions: LoanStatusFilter[] = [
   "Under Review",
   "Approved",
   "Rejected",
-  "Released",
-  "Completed",
-  "Overdue",
 ];
 
 export default function Toolbar({

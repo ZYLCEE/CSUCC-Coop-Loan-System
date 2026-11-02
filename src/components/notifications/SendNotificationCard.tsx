@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Bell, CalendarDays, CheckCircle2, Search, Send, Smartphone, X } from "lucide-react";
 import type { Member } from "@/components/members/MembersData";
@@ -14,11 +15,29 @@ const control = "w-full rounded-lg border border-[#D1D5DB] bg-white px-3 text-sm
 const label = "mb-1.5 block text-xs font-semibold text-[#334155]";
 
 export default function SendNotificationCard({ onRequestCompleted }: { onRequestCompleted?: () => void }) {
-  const { role } = useAdminAuth();
+  const { role, can } = useAdminAuth();
+  const canSend = can("notifications.send");
   const { beginSecureAction } = useSecureAdminAction();
   const [deliveryService, setDeliveryService] = useState<{ delivery_enabled: boolean; scheduling_enabled: boolean } | null>(null);
   const [deliveryError, setDeliveryError] = useState("");
-  useEffect(() => { let active = true; if (role !== "super_admin") return; void getSupabaseClient().rpc("notification_service_status").then(({data,error}) => { if (!active) return; if (error) setDeliveryError("Notification delivery is not configured. Apply the delivery migration and refresh this page."); else setDeliveryService(data); }); return () => { active = false; }; }, [role]);
+  useEffect(() => {
+    let active = true;
+    if (!canSend) return;
+    void (async () => {
+      if (role === "super_admin") {
+        const { data, error } = await getSupabaseClient().rpc("notification_service_status");
+        if (error) throw error;
+        return data;
+      }
+      const { data } = await getSupabaseClient().auth.getSession();
+      if (!data.session) throw new Error("Sign in again.");
+      const response = await fetch("/api/admin/notifications", { headers: { Authorization: `Bearer ${data.session.access_token}` } });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error);
+      return result;
+    })().then(data => { if (active) { setDeliveryService(data); setDeliveryError(""); } }).catch(() => { if (active) setDeliveryError("Notification delivery is unavailable. Refresh and retry."); });
+    return () => { active = false; };
+  }, [role, canSend]);
   const [members, setMembers] = useState<Member[]>([]);
   const [memberError, setMemberError] = useState("");
   const [membersLoading, setMembersLoading] = useState(true);
@@ -56,7 +75,7 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
   const specific = sendTo === "specificMember";
   const recipientCount = specific ? selectedMember ? 1 : 0 : members.length;
   const recipientSummary = specific ? selectedMember ? selectedMember.fullName : "Choose a member" : "All members";
-  const enabled = deliveryService?.delivery_enabled && role === "super_admin" && !membersLoading && !memberError && recipientCount > 0 &&
+  const enabled = deliveryService?.delivery_enabled && canSend && !membersLoading && !memberError && recipientCount > 0 &&
     !!title.trim() && !!message.trim() && !pending && !accepted && (delivery === "now" || !!schedule);
   const edited = () => { setAccepted(false); setFormError(""); };
 
@@ -103,8 +122,8 @@ export default function SendNotificationCard({ onRequestCompleted }: { onRequest
         <div className="border-b border-[#E2E8F0] px-5 py-4"><h2 className="text-base font-semibold text-[#17212F]">Compose Member Notification</h2><p className="mt-1 text-xs leading-5 text-[#64748B]">Send a message to the member mobile application.</p></div>
         <div className="space-y-4 p-5">
           {deliveryError && <p role="alert" className="text-xs text-red-700">{deliveryError}</p>}
-          {memberError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-700">{memberError}<button type="button" onClick={() => { setMembersLoading(true); setMemberError(""); setLoadAttempt((value) => value + 1); }} className="ml-2 font-semibold underline">Retry recipients</button></div>}
-          {role !== "super_admin" && <p className="text-xs text-[#64748B]">Sending and scheduling require the existing Super Admin permission.</p>}
+          {memberError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-xs leading-5 text-red-700">{memberError}<button type="button" onClick={() => { setMembersLoading(true); setMemberError(""); setLoadAttempt((value) => value + 1); }} className={`ml-2 ${actionButtonStyles("secondary", "xs")}`}>Retry recipients</button></div>}
+          {!canSend && <p className="text-xs text-[#64748B]">Your Super Admin can enable member notifications for your account.</p>}
           <div><label className={label} htmlFor="notification-recipient">Recipients</label><select id="notification-recipient" value={sendTo} disabled={pending} onChange={(event) => { setSendTo(event.target.value as RecipientTarget); setSelectedMember(null); setMemberSearch(""); edited(); }} className={`${control} h-10`}>
             <option value="allMembers">All Members</option><option value="specificMember">Specific Member</option>
             <option value="activeLoanMembers" disabled>Active Loan Members — delivery support unavailable</option><option value="selectedMembers" disabled>Selected Members — delivery support unavailable</option>

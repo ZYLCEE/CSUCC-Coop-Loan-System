@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useState } from "react";
 import LoanDetailsModal from "../loan-applications/LoanDetailsModal";
 import Link from "next/link";
@@ -36,7 +37,7 @@ export default function RecentApplications({
           <h2 id="recent-applications-heading" className="text-base font-semibold text-[#17212F]">Recent Loan Applications</h2>
           <p className="mt-1 text-xs leading-5 text-[#64748B]">The five most recently submitted applications</p>
         </div>
-        <Link href={applicationsHref} className="inline-flex items-center gap-1.5 rounded text-xs font-semibold text-[#145B3C] hover:underline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#145B3C]">View All<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
+        <Link href={applicationsHref} className={actionButtonStyles()}>View All<ArrowRight className="h-3.5 w-3.5" aria-hidden="true" /></Link>
       </div>
       <div className="overflow-x-auto" role="region" aria-label="Recent loan applications table" tabIndex={0}>
         <table className="w-full min-w-[960px] text-left text-[13px]">
@@ -67,7 +68,7 @@ export default function RecentApplications({
                 <td className="whitespace-nowrap px-5 py-3 text-right font-semibold text-[#17212F] tabular-nums">{formatPeso(application.amount)}</td>
                 <td className="whitespace-nowrap px-5 py-3 text-[#64748B]">{formatSubmissionDate(application.submittedAt)}</td>
                 <td className="whitespace-nowrap px-5 py-3"><span className={`inline-flex rounded-full border px-2.5 py-1 text-[11px] font-medium ${statusStyles[application.status]}`}>{application.status}</span></td>
-                <td className="whitespace-nowrap px-5 py-3"><button type="button" onClick={() => setDetailId(application.id)} className="text-xs font-medium text-green-800 underline">View Details</button></td>
+                <td className="whitespace-nowrap px-5 py-3"><button type="button" onClick={() => setDetailId(application.id)} className={actionButtonStyles()}>View Details</button></td>
               </tr>
             ))}
           </tbody>

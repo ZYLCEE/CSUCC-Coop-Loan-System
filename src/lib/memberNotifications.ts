@@ -1,5 +1,5 @@
 import { getSupabaseClient } from "@/lib/supabase";
-import { getAdminRole } from "@/lib/auth/roles";
+import { hasAdminPrivilege } from "@/lib/adminPrivileges";
 
 export type OutgoingStatus = "all" | "sent" | "scheduled" | "failed";
 export interface OutgoingNotification {
@@ -16,11 +16,11 @@ export interface OutgoingNotification {
 
 export async function fetchOutgoingNotifications(userId: string, status: OutgoingStatus, search = "", offset = 0) {
   const client = getSupabaseClient();
-  const { data: sessionData, error: sessionError } = await client.auth.getSession();
-  const user = sessionData.session?.user;
-  if (sessionError || !user || user.id !== userId || getAdminRole(user) !== "super_admin" ||
+  const { data: sessionData, error: sessionError } = await client.auth.getUser();
+  const user = sessionData.user;
+  if (sessionError || !user || user.id !== userId || !hasAdminPrivilege(user, "notifications.send") ||
     (user.app_metadata.account_status && user.app_metadata.account_status !== "active")) {
-    throw new Error("Outgoing notification history is available only to authorized Super Admin accounts.");
+    throw new Error("Outgoing notification history requires member notification privileges.");
   }
   // These are the outgoing fields already used by the legacy protected sender.
   // Never substitute recipient inbox rows for a missing outgoing delivery ledger.

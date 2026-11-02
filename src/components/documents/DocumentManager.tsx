@@ -1,5 +1,7 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
+import { Download, Trash2 } from "lucide-react";
 import { useEffect, useRef, useState } from 'react';
 import { adminRequest } from '@/lib/adminRequest';
 import { useAdminAuth } from '@/components/auth/AdminAuthProvider';
@@ -15,7 +17,7 @@ const labels: Record<string, string> = {
 const pageSize = 20;
 
 export default function DocumentManager() {
-  const { role } = useAdminAuth();
+  const { can } = useAdminAuth();
   const [documents, setDocuments] = useState<DocumentRecord[]>([]);
   const [query, setQuery] = useState('');
   const [source, setSource] = useState('all');
@@ -70,7 +72,7 @@ export default function DocumentManager() {
         <option value="all">All sources</option><option value="loan">Loan attachments</option><option value="cooperative">Cooperative uploads</option>
       </select>
       <button disabled={busy || !loaded} onClick={() => void load()} className="rounded-lg border border-slate-300 px-3 py-2 text-sm disabled:opacity-50">Refresh documents</button>
-      {role === 'super_admin' && <><button disabled={busy || !loaded} onClick={() => input.current?.click()} className="rounded-lg bg-green-800 px-3 py-2 text-sm text-white disabled:opacity-50">Upload cooperative document</button>
+      {can('documents.upload') && <><button disabled={busy || !loaded} onClick={() => input.current?.click()} className="rounded-lg bg-green-800 px-3 py-2 text-sm text-white disabled:opacity-50">Upload cooperative document</button>
         <input ref={input} aria-label="Upload cooperative document" type="file" accept=".pdf,.docx,.png,.jpg,.jpeg" hidden disabled={busy} onChange={event => void upload(event.target.files?.[0])} /></>}
     </div>
     <p className="mb-4 text-xs text-slate-500">Download links expire after five minutes; refresh to renew. Cooperative uploads support PDF, DOCX, PNG and JPG up to the limit in portal settings (maximum 10 MB).</p>
@@ -85,12 +87,12 @@ export default function DocumentManager() {
           <td className="p-3">{document.source === 'loan' ? <><p>Loan attachment</p><p className="text-xs text-slate-500">{document.applicationId ?? 'Application unavailable'}</p></> : 'Cooperative upload'}</td>
           <td className="whitespace-nowrap p-3">{document.size == null ? 'Not recorded' : `${(document.size / 1024).toFixed(1)} KB`}</td>
           <td className="whitespace-nowrap p-3">{document.createdAt && Number.isFinite(Date.parse(document.createdAt)) ? new Date(document.createdAt).toLocaleDateString('en-PH') : 'Not recorded'}</td>
-          <td className="p-3"><div className="flex flex-wrap gap-3">{document.url ? <a href={document.url} target="_blank" rel="noopener noreferrer" className="whitespace-nowrap text-green-800 underline">View / download</a> : <span className="text-xs text-red-700">{document.linkError ?? 'File unavailable'}</span>}
-            {role === 'super_admin' && document.source === 'cooperative' && <button disabled={busy} onClick={() => void remove(document.id)} className="text-red-700">Delete</button>}</div></td>
+          <td className="p-3"><div className="flex flex-wrap items-center gap-2">{document.url ? <a href={document.url} target="_blank" rel="noopener noreferrer" className={actionButtonStyles()}><Download className="h-4 w-4" aria-hidden="true" />View / download</a> : <span className="text-xs text-red-700">{document.linkError ?? 'File unavailable'}</span>}
+            {can('documents.delete') && document.source === 'cooperative' && <button disabled={busy} onClick={() => void remove(document.id)} className={actionButtonStyles("danger")}><Trash2 className="h-4 w-4" aria-hidden="true" />Delete</button>}</div></td>
         </tr>)}</tbody>
       </table></div>
       {!busy && !error && !filtered.length && <p className="py-8 text-center text-sm text-slate-500">{documents.length ? 'No documents match your search or source filter.' : 'No documents found.'}</p>}
-      {pages > 1 && <nav aria-label="Document pagination" className="mt-4 flex items-center justify-end gap-4 text-sm"><button disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} className="disabled:opacity-40">Previous</button><span>Page {currentPage} of {pages}</span><button disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)} className="disabled:opacity-40">Next</button></nav>}
+      {pages > 1 && <nav aria-label="Document pagination" className="mt-4 flex items-center justify-end gap-4 text-sm"><button disabled={currentPage <= 1} onClick={() => setPage(currentPage - 1)} className={actionButtonStyles()}>Previous</button><span>Page {currentPage} of {pages}</span><button disabled={currentPage >= pages} onClick={() => setPage(currentPage + 1)} className={actionButtonStyles()}>Next</button></nav>}
     </>}
   </section>;
 }

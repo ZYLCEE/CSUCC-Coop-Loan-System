@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import MemberToolbar from "@/components/members/MemberToolbar";
@@ -356,11 +357,11 @@ export default function MembersPage() {
         {membersError ? (
           <div role="alert" className="border-t border-[#E5E7EB] px-4 py-8 text-center text-sm font-medium text-[#B91C1C]">
             {membersError}
-            {sessionExpired && <Link href="/login" className="ml-2 font-semibold underline">Sign in again</Link>}
+            {sessionExpired && <Link href="/login" className={`ml-2 ${actionButtonStyles()}`}>Sign in again</Link>}
             <button
               type="button"
               onClick={refreshMembers}
-              className="ml-2 font-semibold underline"
+              className={`ml-2 ${actionButtonStyles()}`}
             >
               Retry
             </button>

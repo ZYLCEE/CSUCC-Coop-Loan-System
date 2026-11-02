@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Toolbar, {
   LoanSortOption,
@@ -263,7 +264,7 @@ export default function LoanApplicationsPage() {
           <button
             type="button"
             onClick={refreshApplications}
-            className="ml-2 underline"
+            className={`ml-2 ${actionButtonStyles()}`}
           >
             Retry
           </button>

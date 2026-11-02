@@ -1,3 +1,4 @@
+import { hasAdminPrivilege } from "./adminPrivileges.ts";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
@@ -12,7 +13,7 @@ const row = { id: "outgoing-1", user_id: null, title: "Recorded outgoing message
 function service(response, user = actor) {
   const calls = [];
   const client = {
-    auth: { getSession: async () => ({ data: { session: user ? { user } : null }, error: null }) },
+    auth: { getUser: async () => ({ data: { user }, error: null }) },
     from(table) {
       const call = { table, filters: [] }; calls.push(call);
       return {
@@ -29,7 +30,7 @@ function service(response, user = actor) {
   const exports = {};
   const dependencies = {
     "@/lib/supabase": { getSupabaseClient: () => client },
-    "@/lib/auth/roles": { getAdminRole: user => user.app_metadata.role },
+    "@/lib/adminPrivileges": { hasAdminPrivilege },
   };
   new Function("require", "exports", compiled)(name => dependencies[name], exports);
   return { ...exports, calls };
@@ -64,7 +65,7 @@ test("incoming or unsupported-status records cannot masquerade as outgoing deliv
 test("current outgoing permissions are preserved and unauthorized requests never query records", async () => {
   for (const user of [null, { ...actor, app_metadata: { role: "admin" } }, { ...actor, app_metadata: { role: "super_admin", account_status: "blocked" } }]) {
     const api = service(null, user);
-    await assert.rejects(api.fetchOutgoingNotifications(actor.id, "all"), /authorized Super Admin/);
+    await assert.rejects(api.fetchOutgoingNotifications(actor.id, "all"), /notification privileges/);
     assert.equal(api.calls.length, 0);
   }
 });

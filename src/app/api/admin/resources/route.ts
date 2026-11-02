@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { hasAdminPrivilege, isActiveAdministrator } from '@/lib/adminPrivileges';
 
 const tables: Record<string, string> = { active: 'loan_applications', loans: 'loan_applications', members: 'members', payments: 'loan_payments', audit: 'admin_activity_logs' };
 const configNames = new Set(['general']);
@@ -19,10 +20,15 @@ async function handle(request: Request) {
     const { data: { user }, error } = await client.auth.getUser(bearer);
     if (error || !user) return Response.json({ error: 'Session expired.' }, { status: 401 });
     const role = user.app_metadata.role;
-    if (!['admin', 'coop_admin', 'super_admin'].includes(role) || (user.app_metadata.account_status && user.app_metadata.account_status !== 'active')) return Response.json({ error: 'Access denied.' }, { status: 403 });
+    if (!isActiveAdministrator(user)) return Response.json({ error: 'Access denied.' }, { status: 403 });
     const write = request.method !== 'GET';
-    if (write && role !== 'super_admin') return Response.json({ error: 'Super Admin access required.' }, { status: 403 });
     const resource = new URL(request.url).searchParams.get('resource') ?? '';
+    if (write && role !== 'super_admin') {
+      const privilege = resource === 'general' && request.method === 'POST' ? 'settings.manage'
+        : resource === 'documents' && request.method === 'POST' ? 'documents.upload'
+        : resource === 'documents' && request.method === 'DELETE' ? 'documents.delete' : null;
+      if (!privilege || !hasAdminPrivilege(user, privilege)) return Response.json({ error: 'You do not have permission to perform this action.' }, { status: 403 });
+    }
     if (tables[resource] && !write) {
       const rows: Record<string, unknown>[] = [];
       for (let offset = 0; ; offset += 500) {
@@ -31,7 +37,7 @@ async function handle(request: Request) {
         rows.push(...data);
         if (data.length < 500) break;
       }
-      return Response.json(resource === 'active' ? rows.filter(row => ['approved','released','overdue'].includes(String(row.status))) : rows, { headers: { 'Cache-Control': 'no-store' } });
+      return Response.json(resource === 'active' ? rows.filter(row => ['released','overdue'].includes(String(row.status))) : rows, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (!configNames.has(resource) && resource !== 'documents') return Response.json({ error: 'Unknown resource or unsupported operation.' }, { status: 400 });
     if (resource === 'documents' && !write) {

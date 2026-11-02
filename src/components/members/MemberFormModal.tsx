@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import {
   FormEvent,
   ReactNode,
@@ -355,7 +356,7 @@ export default function MemberFormModal({
                     type="button"
                     onClick={retryAccountIdPreview}
                     disabled={accountIdPreviewLoading}
-                    className="shrink-0 text-[11px] font-semibold text-[#155D3B] underline disabled:cursor-wait disabled:opacity-60"
+                    className={actionButtonStyles("secondary", "xs")}
                   >
                     Retry
                   </button>

@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
+import * as privilegesModule from '../../../../lib/adminPrivileges.ts';
 
 const code = ts.transpileModule(readFileSync(new URL('./route.ts', import.meta.url),'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
-function setup(role='super_admin',pages=[[]]) {
+function setup(role='super_admin',pages=[[]],privileges=[]) {
   const calls=[];
-  const client={auth:{getUser:async()=>({data:{user:role?{id:'caller',app_metadata:{role,account_status:'active'}}:null},error:null})},from(table){return{select(){return this;},order(){return this;},async range(start,end){calls.push({table,start,end});return{data:pages.shift()??[],error:null};}};},storage:{getBucket:async()=>({data:{name:'coop-admin-resources'},error:null}),from(bucket){return{upload:async(path,blob,options)=>{calls.push({bucket,path,options,content:await blob.text()});return{error:null};},download:async()=>({data:new Blob(['{}']),error:null}),remove:async(paths)=>{calls.push({bucket,paths});return{error:null};}};}}};
+  const client={auth:{getUser:async()=>({data:{user:role?{id:'caller',app_metadata:{role,account_status:'active',admin_privileges:privileges}}:null},error:null})},from(table){return{select(){return this;},order(){return this;},async range(start,end){calls.push({table,start,end});return{data:pages.shift()??[],error:null};}};},storage:{getBucket:async()=>({data:{name:'coop-admin-resources'},error:null}),from(bucket){return{upload:async(path,blob,options)=>{calls.push({bucket,path,options,content:await blob.text()});return{error:null};},download:async()=>({data:new Blob(['{}']),error:null}),remove:async(paths)=>{calls.push({bucket,paths});return{error:null};}};}}};
   const exports={};
-  new Function('require','exports','process',code)(()=>({createClient:()=>client}),exports,{env:{NEXT_PUBLIC_SUPABASE_URL:'https://project.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server-only-test-key'}});
+  new Function('require','exports','process',code)(name=>name==='@/lib/adminPrivileges'?privilegesModule:{createClient:()=>client},exports,{env:{NEXT_PUBLIC_SUPABASE_URL:'https://project.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server-only-test-key'}});
   const request=(resource,method='GET',body)=>new Request(`http://localhost/api/admin/resources?resource=${resource}`,{method,headers:{Authorization:'Bearer test','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
   return{...exports,calls,request,client};
 }
@@ -21,10 +22,19 @@ test('regular admins can read but cannot write configuration or delete documents
   assert.equal((await f.POST(f.request('general','POST',{}))).status,403);
   assert.equal((await f.DELETE(f.request('documents','DELETE',{id:'documents/file.pdf'}))).status,403);
 });
-test('pagination reads beyond a service page and active list excludes completed loans',async()=>{
+test('pagination reads beyond a service page and active list excludes unreleased and completed loans',async()=>{
   const page=Array.from({length:500},(_,id)=>({id,status:'released'}));
-  const f=setup('super_admin',[page,[{id:501,status:'completed'},{id:502,status:'overdue'}]]);
+  const f=setup('super_admin',[page,[{id:501,status:'completed'},{id:502,status:'overdue'},{id:503,status:'approved'},{id:504,status:'pending'},{id:505,status:'under review'},{id:506,status:'rejected'}]]);
   const response=await f.GET(f.request('active'));const rows=await response.json();assert.equal(rows.length,501);assert.deepEqual(f.calls.map(call=>call.start),[0,500]);assert.ok(rows.every(row=>row.status!=='completed'));
+});
+test('an approved loan enters Active Loans only after being marked as released',async()=>{
+  const loan={id:1,application_id:'APP-001',status:'approved'};
+  for(const role of ['super_admin','admin']) {
+    const before=setup(role,[[{...loan}]]);
+    assert.deepEqual(await (await before.GET(before.request('active'))).json(),[]);
+    const after=setup(role,[[{...loan,status:'released'}]]);
+    assert.deepEqual(await (await after.GET(after.request('active'))).json(),[{...loan,status:'released'}]);
+  }
 });
 test('arbitrary tables and write operations to financial tables are rejected',async()=>{
   const f=setup();assert.equal((await f.GET(f.request('admin_action_grants'))).status,400);assert.equal((await f.POST(f.request('loans','POST',{amount:1}))).status,400);assert.equal(f.calls.length,0);
@@ -37,6 +47,23 @@ test('portal settings are persisted only after validation and use private storag
 });
 test('document path traversal is rejected before storage deletion',async()=>{
   const f=setup();assert.equal((await f.DELETE(f.request('documents','DELETE',{id:'configuration/../general.json'}))).status,400);assert.equal(f.calls.length,0);
+});
+
+test('document privileges grant only the assigned operation and revocation denies it again', async () => {
+  const f = setup('admin', [[]], ['documents.delete']);
+  assert.equal((await f.DELETE(f.request('documents', 'DELETE', { id: 'documents/file.pdf' }))).status, 200);
+  assert.equal((await f.POST(f.request('documents', 'POST', {}))).status, 403);
+  assert.equal((await f.POST(f.request('general', 'POST', {}))).status, 403);
+  const revoked = setup('admin', [[]], []);
+  assert.equal((await revoked.DELETE(revoked.request('documents', 'DELETE', { id: 'documents/file.pdf' }))).status, 403);
+});
+
+test('general settings can be saved by an individually authorized admin', async () => {
+  const f = setup('admin', [[]], ['settings.manage']);
+  const settings = { cooperativeName: 'Test cooperative', maxUploadSize: 5, allowedFileTypes: 'PDF, PNG' };
+  assert.equal((await f.POST(f.request('general', 'POST', settings))).status, 200);
+  assert.equal(f.calls[0].path, 'configuration/general.json');
+  assert.equal((await f.DELETE(f.request('documents', 'DELETE', { id: 'documents/file.pdf' }))).status, 403);
 });
 
 function documentStorage(f, { missingBucket = false, brokenPath = '' } = {}) {

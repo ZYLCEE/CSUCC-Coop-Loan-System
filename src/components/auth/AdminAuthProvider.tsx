@@ -11,6 +11,7 @@ import {
 import { User } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
+import { hasAdminPrivilege, type AdminPrivilege } from "@/lib/adminPrivileges";
 import {
   AdminRole,
   getAdminDashboardPath,
@@ -23,6 +24,8 @@ interface AdminAuthContextValue {
   loading: boolean;
   configurationError: string | null;
   signOut: () => Promise<void>;
+  can: (privilege: AdminPrivilege) => boolean;
+  refreshUser: () => Promise<void>;
 }
 
 const AdminAuthContext = createContext<AdminAuthContextValue | null>(null);
@@ -59,15 +62,17 @@ export function AdminAuthProvider({
     const supabase = clientState.client;
     if (!supabase) return;
 
-    void supabase.auth.getSession().then(({ data, error }) => {
+    void supabase.auth.getSession().then(async ({ data, error }) => {
       if (error) {
         console.error("Unable to validate the admin session:", error);
         setSessionError("Unable to validate the admin session.");
         setLoading(false);
         return;
       }
-      setUser(data.session?.user ?? null);
-      const status = data.session?.user?.app_metadata.account_status;
+      const current = data.session ? await supabase.auth.getUser() : null;
+      if (current?.error) throw current.error;
+      setUser(current?.data.user ?? null);
+      const status = current?.data.user?.app_metadata.account_status;
       setAccountStatus(status && status !== "active" ? "denied" : "active");
       setSessionError(null);
       setLoading(false);
@@ -88,6 +93,27 @@ export function AdminAuthProvider({
     });
 
     return () => subscription.unsubscribe();
+  }, [clientState.client]);
+
+  useEffect(() => {
+    const client = clientState.client;
+    if (!client) return;
+    let active = true;
+    const refresh = () => {
+      if (document.visibilityState === "hidden") return;
+      void client.auth.getUser().then(({ data, error }) => {
+        if (!active) return;
+        if (error) return;
+        if (!data.user) { setUser(null); return; }
+        setUser(current => JSON.stringify(current) === JSON.stringify(data.user) ? current : data.user);
+        const status = data.user.app_metadata.account_status;
+        setAccountStatus(status && status !== "active" ? "denied" : "active");
+      }).catch(() => { /* Requests still check current privileges on the server. */ });
+    };
+    const timer = window.setInterval(refresh, 30000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { active = false; window.clearInterval(timer); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
   }, [clientState.client]);
 
   useEffect(() => {
@@ -112,6 +138,15 @@ export function AdminAuthProvider({
     }
     setUser(null);
     router.replace("/login");
+  };
+
+  const refreshUser = async () => {
+    if (!clientState.client) throw new Error("Account service is unavailable.");
+    const { data, error } = await clientState.client.auth.getUser();
+    if (error) throw error;
+    setUser(data.user);
+    const status = data.user?.app_metadata.account_status;
+    setAccountStatus(status && status !== "active" ? "denied" : "active");
   };
 
   if (configurationError) {
@@ -140,7 +175,7 @@ export function AdminAuthProvider({
 
   return (
     <AdminAuthContext.Provider
-      value={{ user, role, loading, configurationError, signOut }}
+      value={{ user, role, loading, configurationError, signOut, refreshUser, can: privilege => hasAdminPrivilege(user, privilege) }}
     >
       {children}
     </AdminAuthContext.Provider>

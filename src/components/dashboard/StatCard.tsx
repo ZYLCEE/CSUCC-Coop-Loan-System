@@ -1,5 +1,6 @@
 "use client";
 
+import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import type { LucideIcon } from "lucide-react";
 
 interface StatCardProps {
@@ -47,7 +48,7 @@ export default function StatCard({
           <p className="mt-0.5 break-all text-[22px] font-bold leading-7 tracking-tight text-[#17212F] tabular-nums" title={value}>{value}</p>
           <div className="mt-1 flex items-start justify-between gap-2">
             <p className="text-[11px] leading-4 text-[#64748B]" title={unavailable ? subtitle : undefined}>{unavailable && <span className="sr-only">{subtitle}. </span>}{unavailable ?? subtitle}</p>
-            {onRetry && <button type="button" onClick={onRetry} className="shrink-0 rounded text-[11px] font-semibold leading-4 text-[#145B3C] underline underline-offset-4 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#145B3C]" aria-label={`Retry ${label.toLowerCase()}`}>Retry</button>}
+            {onRetry && <button type="button" onClick={onRetry} className={actionButtonStyles("secondary", "xs")} aria-label={`Retry ${label.toLowerCase()}`}>Retry</button>}
           </div>
         </>
       )}
