@@ -68,6 +68,8 @@ function parseAccount(value: unknown): Member {
     idNumber: value.idNumber,
     fullName: value.fullName,
     email: value.email,
+    phone: typeof value.phone === "string" ? value.phone : "",
+    address: typeof value.address === "string" ? value.address : "",
     role: value.role as MemberRole,
     membershipType: value.membershipType,
     department: value.department,

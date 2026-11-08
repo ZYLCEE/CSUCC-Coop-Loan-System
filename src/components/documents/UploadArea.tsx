@@ -8,13 +8,13 @@ export default function UploadArea() {
       <div className="flex flex-col items-center justify-center text-center">
         {/* Upload Icon */}
         <UploadCloud className="w-8 h-8 text-[#9CA3AF] mb-2" strokeWidth={1.5} />
-        
+
         {/* Main Text */}
         <p className="text-[14px] font-semibold text-[#1F2937] mb-1">Drop files here or click to upload</p>
-        
+
         {/* Subtitle */}
         <p className="text-[12px] text-[#6B7280] mb-2">PDF, DOCX, PNG — Max 10 MB</p>
-        
+
         {/* Browse Files Button */}
         <button className="px-5 h-[32px] bg-[#166534] rounded-[9999px] text-[12px] font-semibold text-white hover:bg-[#145232] transition-colors">
           Browse Files

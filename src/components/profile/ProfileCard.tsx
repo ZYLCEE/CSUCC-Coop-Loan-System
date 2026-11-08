@@ -13,7 +13,7 @@ export default function ProfileCard() {
         <div className="w-16 h-16 rounded-full bg-[#166534] flex items-center justify-center mb-2">
           <span className="text-[22px] font-bold text-white">{initials}</span>
         </div>
-        
+
         {/* Verified Badge */}
         <div className="mb-1.5">
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#ECFDF5] text-[#15803D] text-[10px] font-medium">

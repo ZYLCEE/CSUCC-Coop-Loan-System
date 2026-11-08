@@ -80,6 +80,8 @@ type MemberFormErrors = Partial<
   Record<
     | "fullName"
     | "email"
+    | "phone"
+    | "address"
     | "role"
     | "membershipType"
     | "department"
@@ -104,6 +106,8 @@ const emptyMember: Member = {
   idNumber: "",
   fullName: "",
   email: "",
+  phone: "",
+  address: "",
   department: "",
   role: "Member",
   status: "Active",
@@ -205,6 +209,15 @@ export default function MemberFormModal({
         errors.email = "Enter a valid email domain.";
       }
     }
+    const phone = formData.phone?.trim() ?? "";
+    const address = formData.address?.trim() ?? "";
+    const phoneDigits = phone.replace(/\D/g, "").length;
+    if (!phone) errors.phone = "Contact Number is required.";
+    else if (phone.length > 20 || !/^\+?[0-9() .-]+$/.test(phone) || phoneDigits < 7 || phoneDigits > 15) {
+      errors.phone = "Enter a valid contact number with 7–15 digits and at most 20 characters.";
+    }
+    if (!address) errors.address = "Address is required.";
+    else if (address.length > 500) errors.address = "Address must be 500 characters or fewer.";
     if (formData.role !== "Member" && formData.role !== "Admin") errors.role = "Select a valid account role.";
     if (isMemberAccount && !formData.membershipType) errors.membershipType = "Membership Type is required.";
     if (isRegularMembership && !normalizedDepartment) errors.department = "Department is required for Regular Members.";
@@ -289,6 +302,8 @@ export default function MemberFormModal({
       idNumber: mode === "add" ? "" : formData.idNumber,
       fullName: normalizedFullName,
       email: normalizedEmail,
+      phone: formData.phone?.trim() ?? "",
+      address: formData.address?.trim() ?? "",
       department: isRegularMembership ? normalizedDepartment : "",
       status: "Active",
       membershipType: isMemberAccount ? formData.membershipType ?? "regular" : null,
@@ -426,6 +441,37 @@ export default function MemberFormModal({
               autoCapitalize="none"
               spellCheck={false}
               onChange={(event) => updateField("email", event.target.value)}
+              className={floatingControlClass}
+            />
+          </FloatingField>
+
+          <FloatingField id="phone" label="Contact Number" error={formErrors.phone}>
+            <input
+              id="phone"
+              name="phone"
+              type="tel"
+              autoComplete="tel"
+              required
+              maxLength={20}
+              value={formData.phone ?? ""}
+              aria-invalid={Boolean(formErrors.phone)}
+              aria-describedby={formErrors.phone ? "phone-error" : undefined}
+              onChange={(event) => updateField("phone", event.target.value)}
+              className={floatingControlClass}
+            />
+          </FloatingField>
+
+          <FloatingField id="address" label="Address" error={formErrors.address}>
+            <input
+              id="address"
+              name="address"
+              autoComplete="street-address"
+              required
+              maxLength={500}
+              value={formData.address ?? ""}
+              aria-invalid={Boolean(formErrors.address)}
+              aria-describedby={formErrors.address ? "address-error" : undefined}
+              onChange={(event) => updateField("address", event.target.value)}
               className={floatingControlClass}
             />
           </FloatingField>

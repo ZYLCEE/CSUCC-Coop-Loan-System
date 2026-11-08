@@ -73,7 +73,7 @@ export default function Backup() {
       {/* Backup History Card */}
       <div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-5">
         <h2 className="text-[20px] font-bold text-[#1F2937] mb-4">Backup History</h2>
-        
+
         <div className="space-y-0">
           {backups.map((backup, index) => (
             <div key={backup.id}>

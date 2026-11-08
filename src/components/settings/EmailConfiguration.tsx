@@ -16,7 +16,7 @@ export default function EmailConfiguration() {
   return (
     <div className="bg-white rounded-[14px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
       <h2 className="text-[16px] font-bold text-[#111827] mb-4">Email Configuration</h2>
-      
+
       <div className="space-y-3">
         <div>
           <label className="block text-[11px] font-medium text-[#6B7280] mb-1 tracking-wider uppercase">

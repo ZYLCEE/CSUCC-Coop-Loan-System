@@ -1,39 +1,29 @@
 "use client";
 
-import Sidebar from "@/components/shared/Sidebar";
-import Navbar from "@/components/shared/Navbar";
-import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
-import { AdminAuthProvider } from "@/components/auth/AdminAuthProvider";
-import { SecureAdminActionProvider } from "@/components/auth/SecureAdminActionProvider";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { AdminAuthProvider, useAdminAuth } from "@/components/auth/AdminAuthProvider";
+import { getAdminPortalPrefix } from "@/lib/auth/roles";
 
-function AdminContent({ children }: { children: React.ReactNode }) {
-  const { isCollapsed } = useSidebar();
+function LegacyAdminRedirect() {
+  const { role } = useAdminAuth();
+  const pathname = usePathname();
+  const router = useRouter();
 
-  return (
-    <main className={`transition-all duration-300 ${
-      isCollapsed ? "ml-[76px]" : "ml-64"
-    } mt-[72px] min-w-0 px-4 py-6 sm:px-6 xl:px-9`}>
-      {children}
-    </main>
-  );
+  useEffect(() => {
+    if (role) {
+      const { search, hash } = window.location;
+      router.replace(`${getAdminPortalPrefix(role)}${pathname}${search}${hash}`);
+    }
+  }, [pathname, role, router]);
+
+  return <p role="status" className="p-6">Opening the admin portal...</p>;
 }
 
-export default function AdminLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function LegacyAdminLayout() {
   return (
-    <AdminAuthProvider>
-      <SecureAdminActionProvider>
-        <SidebarProvider>
-          <div className="portal-shell min-h-screen bg-[#F5F6F8]">
-            <Sidebar />
-            <Navbar />
-            <AdminContent>{children}</AdminContent>
-          </div>
-        </SidebarProvider>
-      </SecureAdminActionProvider>
+    <AdminAuthProvider requiredRole={null}>
+      <LegacyAdminRedirect />
     </AdminAuthProvider>
   );
 }

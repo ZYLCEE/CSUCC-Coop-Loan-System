@@ -1,4 +1,4 @@
-import { User } from "@supabase/supabase-js";
+import type { User } from "@supabase/supabase-js";
 
 export type AdminRole = "admin" | "super_admin";
 
@@ -9,8 +9,10 @@ export function getAdminRole(user: User | null): AdminRole | null {
   return null;
 }
 
+export function getAdminPortalPrefix(role: AdminRole): string {
+  return role === "super_admin" ? "/super-admin" : "/admin";
+}
+
 export function getAdminDashboardPath(role: AdminRole): string {
-  return role === "super_admin"
-    ? "/super-admin/dashboard"
-    : "/admin/dashboard";
+  return `${getAdminPortalPrefix(role)}/dashboard`;
 }

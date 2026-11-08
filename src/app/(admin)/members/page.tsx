@@ -285,6 +285,8 @@ export default function MembersPage() {
     const payload = {
       fullName: member.fullName,
       email: member.email,
+      phone: member.phone,
+      address: member.address,
       role: member.role,
       membershipType:
         member.role === "Member" ? member.membershipType : null,
@@ -311,6 +313,8 @@ export default function MembersPage() {
       details: [
         { label: "Full Name", value: member.fullName },
         { label: "Email", value: member.email },
+        { label: "Contact Number", value: member.phone ?? "" },
+        { label: "Address", value: member.address ?? "" },
         { label: "Role", value: member.role },
         ...(member.role === "Member"
           ? [

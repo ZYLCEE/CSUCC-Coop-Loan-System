@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff, LockKeyhole } from "lucide-react";
+import { isActiveAdministrator } from "@/lib/adminPrivileges";
 import { getSupabaseClient } from "@/lib/supabase";
 import { getAdminDashboardPath, getAdminRole } from "@/lib/auth/roles";
 
@@ -42,8 +43,7 @@ export default function AdminLoginPage() {
         return;
       }
 
-      const metadataStatus = data.user.app_metadata.account_status;
-      if (metadataStatus && metadataStatus !== "active") {
+      if (!isActiveAdministrator(data.user)) {
         await supabase.auth.signOut();
         setErrorMessage("This account is blocked or inactive. Please contact your system administrator.");
         return;

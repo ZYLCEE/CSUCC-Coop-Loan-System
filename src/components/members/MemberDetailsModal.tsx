@@ -20,6 +20,8 @@ export default function MemberDetailsModal({ member, onClose }: MemberDetailsMod
     { label: "ID Number", value: member.idNumber },
     { label: "Full Name", value: member.fullName },
     { label: "Email Address", value: member.email },
+    { label: "Contact Number", value: member.phone },
+    { label: "Address", value: member.address },
     { label: "Department", value: member.department },
   ];
 

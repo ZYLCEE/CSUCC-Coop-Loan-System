@@ -1,11 +1,12 @@
 "use client";
 
-import { AdminRole } from "@/lib/auth/roles";
+import type { AdminRole } from "@/lib/auth/roles";
 import { AdminAuthProvider } from "@/components/auth/AdminAuthProvider";
 import { SecureAdminActionProvider } from "@/components/auth/SecureAdminActionProvider";
 import Sidebar from "@/components/shared/Sidebar";
 import Navbar from "@/components/shared/Navbar";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
+import SuperAdminLoanAlerts from "@/components/shared/SuperAdminLoanAlerts";
 
 function PortalContent({ children }: { children: React.ReactNode }) {
   const { isCollapsed } = useSidebar();
@@ -35,6 +36,7 @@ export default function AdminPortalLayout({
             <Sidebar />
             <Navbar />
             <PortalContent>{children}</PortalContent>
+            {role === "super_admin" && <SuperAdminLoanAlerts />}
           </div>
         </SidebarProvider>
       </SecureAdminActionProvider>

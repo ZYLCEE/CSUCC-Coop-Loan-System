@@ -14,6 +14,8 @@ export interface Member {
   idNumber: string;
   fullName: string;
   email: string;
+  phone?: string;
+  address?: string;
   department: string;
   role: MemberRole;
   status: MemberStatus;

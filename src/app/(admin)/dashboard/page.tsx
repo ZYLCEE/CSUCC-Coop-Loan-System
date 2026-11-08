@@ -9,6 +9,8 @@ import RecentApplications from "@/components/dashboard/RecentApplications";
 import { getReportRange, summarizeLoans, type ReportingPeriod } from "@/components/dashboard/dashboard-model";
 import { useDashboardData } from "@/components/dashboard/useDashboardData";
 import { getLoanTypeDistribution } from "@/components/dashboard/loan-type-distribution";
+import Image from "next/image";
+import coopLogo from "../../../../assets/csucc-logo1.png";
 
 export default function DashboardPage() {
   const pathname = usePathname();
@@ -33,15 +35,28 @@ export default function DashboardPage() {
 
   return (
     <div className="-mx-3 -mt-1 min-w-0 space-y-4 text-[#17212F] sm:space-y-5">
-      <div role="group" aria-label="Dashboard reporting filters" className="flex min-w-0 justify-end">
-        <div className="max-w-full">
-          <label htmlFor="dashboard-period" className="sr-only">Reporting period</label>
-          <div className="relative inline-flex max-w-full items-center">
-            <CalendarDays className="pointer-events-none absolute left-3 h-4 w-4 text-[#64748B]" aria-hidden="true" />
-            <select id="dashboard-period" value={period} onChange={(event) => setPeriod(event.target.value as ReportingPeriod)} className="h-9 w-full min-w-0 max-w-full appearance-none rounded-lg border border-[#E2E8F0] bg-white pl-9 pr-8 text-[11px] font-medium text-[#17212F] shadow-[0_1px_2px_rgba(15,23,42,0.025)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145B3C] sm:text-xs">
-              {filterOptions.map((option) => <option key={option.value} value={option.value}>{option.label} · {option.dateLabel}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 h-3.5 w-3.5 text-[#64748B]" aria-hidden="true" />
+      <div className="flex min-w-0 items-center justify-between gap-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <Image
+            src={coopLogo}
+            alt="CSUCC Employees and Retirees Multipurpose Cooperative logo"
+            width={48}
+            height={48}
+            priority
+            className="h-10 w-10 shrink-0 object-contain sm:h-12 sm:w-12"
+          />
+          <p className="truncate text-sm font-semibold text-[#155D3B] sm:text-base">CSUCC ERMPC</p>
+        </div>
+        <div role="group" aria-label="Dashboard reporting filters" className="flex min-w-0 justify-end">
+          <div className="max-w-full">
+            <label htmlFor="dashboard-period" className="sr-only">Reporting period</label>
+            <div className="relative inline-flex max-w-full items-center">
+              <CalendarDays className="pointer-events-none absolute left-3 h-4 w-4 text-[#64748B]" aria-hidden="true" />
+              <select id="dashboard-period" value={period} onChange={(event) => setPeriod(event.target.value as ReportingPeriod)} className="h-9 w-full min-w-0 max-w-full appearance-none rounded-lg border border-[#E2E8F0] bg-white pl-9 pr-8 text-[11px] font-medium text-[#17212F] shadow-[0_1px_2px_rgba(15,23,42,0.025)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#145B3C] sm:text-xs">
+                {filterOptions.map((option) => <option key={option.value} value={option.value}>{option.label} · {option.dateLabel}</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3 h-3.5 w-3.5 text-[#64748B]" aria-hidden="true" />
+            </div>
           </div>
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Toolbar, {
   LoanSortOption,
   LoanStatusFilter,
@@ -9,6 +9,7 @@ import Toolbar, {
 import LoanApplicationsTable from "@/components/loan-applications/LoanApplicationsTable";
 import { fetchLoanApplications, LoanApplication } from "@/lib/api";
 import { MembershipTypeFilter } from "@/lib/membership";
+import { getSupabaseClient } from "@/lib/supabase";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 
 interface AppliedFilters {
@@ -31,6 +32,7 @@ export default function LoanApplicationsPage() {
   const [applications, setApplications] = useState<LoanApplication[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
+  const [refreshVersion, setRefreshVersion] = useState(0);
   const [searchInput, setSearchInput] = useState("");
   const [memberIdInput, setMemberIdInput] = useState("");
   const [filters, setFilters] = useState<AppliedFilters>({
@@ -46,30 +48,15 @@ export default function LoanApplicationsPage() {
   const { role } = useAdminAuth();
   const readOnly = role !== "super_admin";
 
-  const fetchApplications = useCallback(() => fetchLoanApplications(), []);
-
-  const loadApplications = useCallback(async () => {
-    setLoading(true);
-    setLoadError("");
-    try {
-      setApplications(await fetchApplications());
-    } catch (error) {
-      console.error("Failed to load applications:", error);
-      setLoadError("Unable to load applications from the secure loan database.");
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchApplications]);
-
   const refreshApplications = () => {
     setLoading(true);
     setLoadError("");
-    void loadApplications();
+    setRefreshVersion((version) => version + 1);
   };
 
   useEffect(() => {
     let isActive = true;
-    void fetchApplications()
+    void fetchLoanApplications()
       .then((data) => {
         if (isActive) {
           setApplications(data);
@@ -88,7 +75,21 @@ export default function LoanApplicationsPage() {
     return () => {
       isActive = false;
     };
-  }, [fetchApplications]);
+  }, [refreshVersion]);
+
+  useEffect(() => {
+    const client = getSupabaseClient();
+    const channel = client
+      .channel("admin-loan-applications")
+      .on("postgres_changes", { event: "*", schema: "public", table: "loan_applications" }, () => {
+        setRefreshVersion((version) => version + 1);
+      })
+      .subscribe();
+
+    return () => {
+      void client.removeChannel(channel);
+    };
+  }, []);
 
   const loanTypeOptions = useMemo(() => {
     return Array.from(new Set(applications.map((application) => application.type))).sort();

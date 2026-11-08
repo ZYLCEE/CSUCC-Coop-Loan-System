@@ -18,7 +18,7 @@ export default function DocumentCategoryCard({ icon: Icon, title, count, iconBgC
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${iconBgColor}`}>
           <Icon className={`w-4.5 h-4.5 ${iconColor}`} strokeWidth={2} />
         </div>
-        
+
         {/* Content */}
         <div className="flex-1">
           <h3 className="text-[13px] font-semibold text-[#1F2937] mb-0.5">{title}</h3>

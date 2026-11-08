@@ -18,7 +18,7 @@ export default function MemberStatsCard({ icon: Icon, label, value, iconBgColor,
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${iconBgColor}`}>
           <Icon className={`w-5 h-5 ${iconColor}`} strokeWidth={2} />
         </div>
-        
+
         {/* Content */}
         <div>
           <p className="text-[10px] font-semibold uppercase text-[#6B7280] tracking-wider mb-1">{label}</p>
