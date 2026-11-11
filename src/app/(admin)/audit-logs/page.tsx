@@ -1,3 +1,3 @@
 "use client";
-import RecordsView from "@/components/shared/RecordsView";
-export default function AuditLogsPage() { return <RecordsView resource="audit" title="Audit logs" />; }
+import ActiveLogsWorkspace from "@/components/active-logs/ActiveLogsWorkspace";
+export default function AuditLogsPage() { return <ActiveLogsWorkspace />; }

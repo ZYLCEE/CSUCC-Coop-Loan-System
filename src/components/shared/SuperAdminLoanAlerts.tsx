@@ -1,10 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import {createPortal} from "react-dom";
 import { useRouter } from "next/navigation";
 import { BellRing, Check, Volume2, VolumeX, X } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
+import { adminNotificationReceivedEvent } from "@/lib/adminNotifications";
 
 interface LoanAlert {
   id: string;
@@ -13,6 +15,10 @@ interface LoanAlert {
   amount: string;
   receivedAt: number;
 }
+
+const subscribeToStatusHost = () => () => {};
+const statusOnClient = () => document.getElementById("portal-live-status");
+const statusOnServer = () => null;
 
 function money(value: unknown) {
   const amount = Number(value);
@@ -23,6 +29,7 @@ function money(value: unknown) {
 
 export default function SuperAdminLoanAlerts() {
   const { role } = useAdminAuth();
+  const statusHost = useSyncExternalStore(subscribeToStatusHost, statusOnClient, statusOnServer);
   const router = useRouter();
   const [alerts, setAlerts] = useState<LoanAlert[]>([]);
   const [realtimeStatus, setRealtimeStatus] = useState("connecting");
@@ -101,6 +108,7 @@ export default function SuperAdminLoanAlerts() {
         };
         setAlerts((current) => [alert, ...current].slice(0, 3));
         setAlertError("");
+        window.dispatchEvent(new Event(adminNotificationReceivedEvent));
         playAlert();
 
         if (typeof Notification !== "undefined" && Notification.permission === "granted") {
@@ -134,17 +142,18 @@ export default function SuperAdminLoanAlerts() {
 
   if (role !== "super_admin") return null;
 
+  const statusIndicator = <div title={"Loan alerts "+(realtimeStatus==="connected"?"live":"reconnecting")} className={(statusHost?"portal-live-status":"fixed bottom-4 right-4 z-[90]")+" flex max-w-full items-center gap-1.5 rounded-full border border-[#D7E5DC] bg-white px-2 py-1"}>
+    <span className={`h-2.5 w-2.5 shrink-0 rounded-full ${realtimeStatus === "connected" ? "bg-emerald-500" : "bg-amber-500"}`} aria-label={`Realtime ${realtimeStatus}`} />
+    <span className={statusHost?"sr-only":"text-xs text-slate-600"}>Loan alerts {realtimeStatus === "connected" ? "live" : "reconnecting"}</span>
+    <button type="button" onClick={() => void enableAlerts()} aria-label={soundEnabled ? "Loan alert sound enabled" : "Enable loan alert sound and desktop notifications"} title={soundEnabled ? "Sound enabled" : "Enable sound and desktop notifications"} className="rounded-md p-1 text-[#155D3B] hover:bg-emerald-50">
+      {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
+    </button>
+  </div>;
   return (
     <>
-      <div className="fixed bottom-4 right-4 z-[90] flex max-w-[calc(100vw-2rem)] items-center gap-2 rounded-xl border border-[#D7E5DC] bg-white px-3 py-2 shadow-lg">
-        <span className={`h-2.5 w-2.5 rounded-full ${realtimeStatus === "connected" ? "bg-emerald-500" : "bg-amber-500"}`} aria-label={`Realtime ${realtimeStatus}`} />
-        <span className="text-xs text-slate-600">Loan alerts {realtimeStatus === "connected" ? "live" : "reconnecting"}</span>
-        <button type="button" onClick={() => void enableAlerts()} aria-label={soundEnabled ? "Loan alert sound enabled" : "Enable loan alert sound and desktop notifications"} title={soundEnabled ? "Sound enabled" : "Enable sound and desktop notifications"} className="rounded-md p-1 text-[#155D3B] hover:bg-emerald-50">
-          {soundEnabled ? <Volume2 className="h-4 w-4" /> : <VolumeX className="h-4 w-4" />}
-        </button>
-      </div>
+      {statusHost?createPortal(statusIndicator,statusHost):statusIndicator}
       {alertError && <div role="status" className="fixed bottom-16 right-4 z-[90] rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow">{alertError}</div>}
-      <div aria-live="polite" aria-atomic="false" className="pointer-events-none fixed right-4 top-20 z-[100] flex w-[min(380px,calc(100vw-2rem))] flex-col gap-2">
+      <div aria-live="polite" aria-atomic="false" className="portal-loan-alert-stack pointer-events-none fixed right-4 top-20 z-[100] flex w-[min(380px,calc(100vw-2rem))] flex-col gap-2">
         {alerts.map((alert) => <section key={alert.id} role="status" className="pointer-events-auto rounded-xl border border-emerald-200 bg-white p-4 shadow-xl">
           <div className="flex items-start gap-3">
             <BellRing className="mt-0.5 h-5 w-5 shrink-0 text-[#155D3B]" aria-hidden="true" />

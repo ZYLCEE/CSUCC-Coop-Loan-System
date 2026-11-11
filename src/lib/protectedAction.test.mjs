@@ -20,9 +20,9 @@ test('both stages of notification actions use the dedicated authenticated endpoi
     assert.equal(call.init.headers.Authorization, 'Bearer test-token'); assert.deepEqual(JSON.parse(call.init.body), body);
   }
 });
-test('other protected operations keep their existing edge service and payload', async () => {
+test('other protected operations use the authenticated proxy without changing the grant payload', async () => {
   const f = setup(); const body = { mode: 'verify', action: 'approve-loan', target: 'APP-001', password: 'test-only', payload: {} };
-  await f.invokeProtectedAction(body); assert.deepEqual(f.calls, [{ name: 'secure-admin-action', body }]);
+  await f.invokeProtectedAction(body); assert.equal(f.calls[0].url,'/api/admin/action');assert.equal(f.calls[0].init.headers.Authorization,'Bearer test-token');assert.deepEqual(JSON.parse(f.calls[0].init.body),body);
 });
 test('missing sessions fail before sending and API errors remain visible in the verification dialog', async () => {
   const missing = setup({ session: false }); await assert.rejects(missing.invokeProtectedAction({ action: 'send-notification' }), /Sign in/); assert.equal(missing.calls.length, 0);

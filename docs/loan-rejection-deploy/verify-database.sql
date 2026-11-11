@@ -1,0 +1,9 @@
+select pg_catalog.jsonb_build_object(
+'migration_recorded',exists(select 1 from supabase_migrations.schema_migrations where version='20261110' and name='secure_loan_rejection'),
+'functions',(select pg_catalog.jsonb_agg(pg_catalog.jsonb_build_object('name',p.proname,'owner',pg_catalog.pg_get_userbyid(p.proowner),'security_definer',p.prosecdef,'anon_execute',pg_catalog.has_function_privilege('anon',p.oid,'EXECUTE'),'authenticated_execute',pg_catalog.has_function_privilege('authenticated',p.oid,'EXECUTE'),'service_execute',pg_catalog.has_function_privilege('service_role',p.oid,'EXECUTE'))) from pg_catalog.pg_proc p join pg_catalog.pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname in ('loan_rejection_capability','reject_loan_application','loan_rejection_details')),
+'capability',public.loan_rejection_capability((select u.id from auth.users u where public.is_active_secure_admin(u.id) limit 1)),
+'notification_constraint',(select pg_catalog.pg_get_constraintdef(oid) from pg_catalog.pg_constraint where conrelid='public.notifications'::pg_catalog.regclass and conname='notifications_type_check'),
+'index_valid',(select i.indisvalid and i.indisunique from pg_catalog.pg_index i where i.indexrelid='public.loan_rejection_request_unique'::pg_catalog.regclass),
+'counts',pg_catalog.jsonb_build_object('loans',(select count(*) from public.loan_applications),'audits',(select count(*) from public.admin_activity_logs),'notifications',(select count(*) from public.notifications)),
+'authority',(select pg_catalog.jsonb_agg(r) from (select u.raw_app_meta_data->>'role' as role,count(*) as accounts,count(*) filter(where public.is_active_secure_admin(u.id)) as rejection_authority from auth.users u group by u.raw_app_meta_data->>'role') r)
+) as verification

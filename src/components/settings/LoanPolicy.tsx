@@ -1,5 +1,9 @@
 "use client";
 
+import { ActionFeedback } from "@/components/ui/Feedback";
+
+import { Input } from "@/components/ui/Fields";
+
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useCallback, useEffect, useState } from "react";
 import { fetchLoanPolicy, LoanPolicy as LoanPolicyData } from "@/lib/loanPolicy";
@@ -74,6 +78,9 @@ export default function LoanPolicy() {
       question: "Save these loan policy changes? New applications will use the updated values.",
       confirmLabel: "Save Policy",
       successMessage: "Loan policy saved successfully.",
+      details: [...fields.map(field => ({ label: field.label, value: field.label.includes("₱")
+        ? new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP" }).format(policy[field.key])
+        : String(policy[field.key]) })), { label: "Processing time (working days)", value: policy.loan_processing_time }],
       payload: {
         base_interest_rate: policy.base_interest_rate,
         processing_fee_percent: policy.processing_fee_percent,
@@ -98,30 +105,39 @@ export default function LoanPolicy() {
   };
 
   return (
-    <div className="rounded-[16px] border border-[#E5E7EB] bg-white p-6 shadow-[0_2px_10px_rgba(0,0,0,0.05)]">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <div><h2 className="text-[16px] font-bold text-[#111827]">Loan Policy Settings</h2><p className="mt-1 text-xs text-[#64748B]">Stored in Supabase. Saving requires your Super Admin password and confirmation.</p></div>
+    <div className="ui-card ui-card-padding">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        <div><h2 className="text-card-title">Loan Policy Settings</h2><p className="mt-1 text-xs text-[#64748B]">Stored in Supabase. Saving requires your Super Admin password and confirmation.</p></div>
         <button type="button" onClick={() => void loadPolicy()} disabled={loading || saving} className={actionButtonStyles()}>Reload</button>
       </div>
-      {error && <p role="alert" className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
-      {notice && <p role="status" className="mb-4 rounded-lg bg-green-50 p-3 text-sm text-green-700">{notice}</p>}
+      {error && <ActionFeedback error>{error}</ActionFeedback>}
+      {notice && <ActionFeedback>{notice}</ActionFeedback>}
       {loading || !policy ? <p role="status" className="py-8 text-center text-sm text-[#64748B]">Loading policy from database...</p> : <>
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-          {fields.map(({ key, label, step, min }) => <label key={key} className="block text-[11px] font-medium uppercase tracking-wider text-[#6B7280]">
+          {fields.map(({ key, label, step, min }) => <label key={key} className="block text-label text-portal-primary">
             {label}
-            <input type="number" min={min} step={step} value={policy[key]} disabled={!isSuperAdmin || saving}
+            <Input type="number" min={min} step={step} value={policy[key]} disabled={!isSuperAdmin || saving}
               onChange={(event) => updateNumber(key, event.target.value)}
-              className="mt-1.5 h-[42px] w-full rounded-[12px] border border-[#E5E7EB] bg-white pl-4 text-[16px] text-[#1F2937] focus:border-[#1F6B3A] focus:outline-none focus:ring-2 focus:ring-[#1F6B3A]/20 disabled:bg-slate-100 disabled:text-slate-500" />
+              className="mt-1 block w-full" />
+            {key === 'base_interest_rate' && <span className="mt-1 block text-xs font-normal normal-case tracking-normal text-slate-500">
+              New loans snapshot this rate at release. Repayments accrue monthly interest on the declining principal balance.
+            </span>}
+            {(key === 'processing_fee_percent' || key === 'service_fee_percent') && <span className="mt-1 block text-xs font-normal normal-case tracking-normal text-slate-500">
+              Charged once at release and deducted from the proceeds, not added to each payment.
+            </span>}
+            {key === 'penalty_rate_percent' && <span className="mt-1 block text-xs font-normal normal-case tracking-normal text-slate-500">
+              Applied to overdue installments using recorded effective dates. Unknown historical periods are not back-charged.
+            </span>}
           </label>)}
-          <label className="block text-[11px] font-medium uppercase tracking-wider text-[#6B7280]">Loan Processing Time (Working Days)
-            <input type="text" maxLength={100} value={policy.loan_processing_time} disabled={!isSuperAdmin || saving}
+          <label className="block text-label text-portal-primary">Loan Processing Time (Working Days)
+            <Input type="text" maxLength={100} value={policy.loan_processing_time} disabled={!isSuperAdmin || saving}
               onChange={(event) => { if (policy) setPolicy({ ...policy, loan_processing_time: event.target.value }); setNotice(""); }}
-              className="mt-1.5 h-[42px] w-full rounded-[12px] border border-[#E5E7EB] bg-white pl-4 text-[16px] text-[#1F2937] focus:border-[#1F6B3A] focus:outline-none focus:ring-2 focus:ring-[#1F6B3A]/20 disabled:bg-slate-100 disabled:text-slate-500" />
+              className="mt-1 block w-full" />
           </label>
         </div>
         {policy.updated_at && <p className="mt-4 text-xs text-[#64748B]">Last saved: {new Date(policy.updated_at).toLocaleString()}</p>}
         {isSuperAdmin && <button type="button" onClick={() => void handleSave()} disabled={saving || !policy}
-          className="mt-6 h-[42px] rounded-[12px] bg-[#1F6B3A] px-6 text-[14px] font-semibold text-white hover:bg-[#14532D] disabled:cursor-wait disabled:opacity-60">{saving ? "Saving..." : "Save Policy"}</button>}
+          className="ui-button ui-button--primary mt-6">{saving ? "Saving..." : "Save Policy"}</button>}
       </>}
     </div>
   );

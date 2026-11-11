@@ -4,12 +4,17 @@ import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 import * as privilegesModule from '../../../../lib/adminPrivileges.ts';
 
+function loadModel(path,imports={}) {
+ const exports={};new Function('require','exports',ts.transpileModule(readFileSync(new URL(path,import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(name=>imports[name],exports);return exports;
+}
+const activeModel=loadModel('../../../../lib/activeLoans.ts',{'./membership':loadModel('../../../../lib/membership.ts'),'./loanTypeLabel':loadModel('../../../../lib/loanTypeLabel.ts')});
+const activeData=loadModel('../../../../lib/activeLoansData.ts',{'./activeLoans':activeModel});
 const code = ts.transpileModule(readFileSync(new URL('./route.ts', import.meta.url),'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText;
 function setup(role='super_admin',pages=[[]],privileges=[]) {
   const calls=[];
-  const client={auth:{getUser:async()=>({data:{user:role?{id:'caller',app_metadata:{role,account_status:'active',admin_privileges:privileges}}:null},error:null})},from(table){return{select(){return this;},order(){return this;},async range(start,end){calls.push({table,start,end});return{data:pages.shift()??[],error:null};}};},storage:{getBucket:async()=>({data:{name:'coop-admin-resources'},error:null}),from(bucket){return{upload:async(path,blob,options)=>{calls.push({bucket,path,options,content:await blob.text()});return{error:null};},download:async()=>({data:new Blob(['{}']),error:null}),remove:async(paths)=>{calls.push({bucket,paths});return{error:null};}};}}};
+  const client={auth:{getUser:async()=>({data:{user:role?{id:'caller',app_metadata:{role,account_status:'active',admin_privileges:privileges}}:null},error:null})},from(table){const filters=[];return{select(){return this;},order(){return this;},in(key,values){filters.push(row=>values.includes(row[key]));return this;},eq(key,value){filters.push(row=>row[key]===value);return this;},async range(start,end){calls.push({table,start,end});const rows=table==='loan_payments'?[]:pages.shift()??[];return{data:rows.filter(row=>filters.every(filter=>filter(row))),error:null};}};},storage:{getBucket:async()=>({data:{name:'coop-admin-resources'},error:null}),from(bucket){return{upload:async(path,blob,options)=>{calls.push({bucket,path,options,content:await blob.text()});return{error:null};},download:async()=>({data:new Blob(['{}']),error:null}),remove:async(paths)=>{calls.push({bucket,paths});return{error:null};}};}}};
   const exports={};
-  new Function('require','exports','process',code)(name=>name==='@/lib/adminPrivileges'?privilegesModule:{createClient:()=>client},exports,{env:{NEXT_PUBLIC_SUPABASE_URL:'https://project.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server-only-test-key'}});
+  new Function('require','exports','process',code)(name => name === "@/lib/portalActivityServer" ? {portalActivityHeaders:()=>({}),portalSessionId:()=>null} : name ==='@/lib/adminPrivileges'?privilegesModule:name==='@/lib/activeLoansData'?activeData:{createClient:()=>client},exports,{env:{NEXT_PUBLIC_SUPABASE_URL:'https://project.supabase.co',SUPABASE_SERVICE_ROLE_KEY:'server-only-test-key'}});
   const request=(resource,method='GET',body)=>new Request(`http://localhost/api/admin/resources?resource=${resource}`,{method,headers:{Authorization:'Bearer test','Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
   return{...exports,calls,request,client};
 }
@@ -22,18 +27,19 @@ test('regular admins can read but cannot write configuration or delete documents
   assert.equal((await f.POST(f.request('general','POST',{}))).status,403);
   assert.equal((await f.DELETE(f.request('documents','DELETE',{id:'documents/file.pdf'}))).status,403);
 });
-test('pagination reads beyond a service page and active list excludes unreleased and completed loans',async()=>{
-  const page=Array.from({length:500},(_,id)=>({id,status:'released'}));
-  const f=setup('super_admin',[page,[{id:501,status:'completed'},{id:502,status:'overdue'},{id:503,status:'approved'},{id:504,status:'pending'},{id:505,status:'under review'},{id:506,status:'rejected'}]]);
-  const response=await f.GET(f.request('active'));const rows=await response.json();assert.equal(rows.length,501);assert.deepEqual(f.calls.map(call=>call.start),[0,500]);assert.ok(rows.every(row=>row.status!=='completed'));
+test('pagination reads beyond a service page and active list includes released, overdue and completed loans',async()=>{
+  const fixture={amount:1000,monthly_payment:100,tenure_months:12,member_name:'Synthetic Borrower',loan_type:'Regular'};
+  const page=Array.from({length:500},(_,id)=>({...fixture,id:String(id),application_id:'APP-'+id,status:'released'}));
+  const f=setup('super_admin',[page,[{...fixture,id:'501',application_id:'APP-501',status:'completed'},{...fixture,id:'502',application_id:'APP-502',status:'overdue'},{...fixture,id:'503',status:'approved'},{...fixture,id:'504',status:'pending'},{...fixture,id:'505',status:'under review'},{...fixture,id:'506',status:'rejected'}]]);
+  const response=await f.GET(f.request('active'));const rows=await response.json();assert.equal(response.status,200);assert.equal(rows.length,502);assert.deepEqual(f.calls.filter(call=>call.table==='loan_applications').map(call=>call.start),[0,500]);assert.ok(rows.some(row=>row.status==='Fully Paid'));assert.ok(rows.every(row=>['Released','Overdue','Fully Paid'].includes(row.status)));
 });
 test('an approved loan enters Active Loans only after being marked as released',async()=>{
-  const loan={id:1,application_id:'APP-001',status:'approved'};
+  const loan={id:'1',application_id:'APP-001',amount:1000,monthly_payment:100,tenure_months:12,member_name:'Synthetic Borrower',loan_type:'Regular',status:'approved'};
   for(const role of ['super_admin','admin']) {
     const before=setup(role,[[{...loan}]]);
     assert.deepEqual(await (await before.GET(before.request('active'))).json(),[]);
     const after=setup(role,[[{...loan,status:'released'}]]);
-    assert.deepEqual(await (await after.GET(after.request('active'))).json(),[{...loan,status:'released'}]);
+    const response=await after.GET(after.request('active'));assert.equal(response.status,200);const rows=await response.json();assert.equal(rows.length,1);assert.equal(rows[0].id,loan.id);assert.equal(rows[0].status,'Released');
   }
 });
 test('arbitrary tables and write operations to financial tables are rejected',async()=>{

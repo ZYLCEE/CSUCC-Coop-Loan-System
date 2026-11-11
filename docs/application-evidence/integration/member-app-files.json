@@ -1,0 +1,12 @@
+[
+  "lib/models/loan_consent_submission.dart",
+  "lib/review_terms_screen.dart",
+  "lib/co_maker_invitation_screen.dart",
+  "lib/email_otp_verification_screen.dart",
+  "lib/services/database_service.dart",
+  "lib/services/loan_document_upload_service.dart",
+  "test/loan_consent_submission_test.dart",
+  "supabase/migrations/20261112030000_loan_submission_agreements.sql",
+  "CONSENT-INTEGRATION.md",
+  "test/loan_consent_terms_contract_test.dart"
+]

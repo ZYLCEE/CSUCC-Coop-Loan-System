@@ -1,3 +1,4 @@
+import {portalActivityHeaders,portalSessionId} from "@/lib/portalActivityServer";
 import { createHash, createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
 import { createClient } from '@supabase/supabase-js';
 import { hasAdminPrivilege } from '@/lib/adminPrivileges';
@@ -45,7 +46,7 @@ export async function GET(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return fail('Notification configuration is missing.', 503);
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const client = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:portalActivityHeaders(request)}});
     const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
     if (!token) return fail('Sign in again.', 401);
     const { data: { user }, error } = await client.auth.getUser(token);
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return fail('Server-side notification configuration is missing.', 503);
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const client = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:portalActivityHeaders(request)}});
     const token = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
     if (!token) return fail('Sign in again to continue.', 401);
     const { data: { user }, error: userError } = await client.auth.getUser(token);
@@ -89,9 +90,11 @@ export async function POST(request: Request) {
     const grant = readGrant(body.grant, key);
     if (!grant || grant.user !== user.id || grant.fingerprint !== digest) return fail('Verification expired or the notification changed. Verify your password again.', 401);
 
-    const result = (row: { id: string; status: string; recipient_count: number | null }) => {
+    const result = async (row: { id: string; status: string; recipient_count: number | null }) => {
       if (!['sent', 'scheduled'].includes(row.status) || (row.status === 'sent' && (!Number.isSafeInteger(row.recipient_count) || !(Number(row.recipient_count) > 0)))) return fail('The delivery service did not confirm recipients. Check outgoing history.', 503);
-      return reply({ success: true, result: { id: row.id, status: row.status,
+      const sessionId=portalSessionId(token);let warning:string|undefined;
+      if(sessionId)try{const logged=await client.rpc("append_completed_portal_action",{p_actor_id:user.id,p_auth_session_id:sessionId,p_source_key:"protected:"+createHash('sha256').update('notification:'+row.id).digest('hex'),p_action:row.status==='scheduled'?'schedule-notification':'send-notification',p_target:row.id,p_reason:''});if(logged.error||logged.data===false)warning='The notification was saved, but its activity entry could not be recorded.';}catch{warning='The notification was saved, but its activity entry could not be recorded.';}
+      return reply({ success: true,...(warning?{warning}:{}), result: { id: row.id, status: row.status,
         recipientCount: row.recipient_count, message: row.status === 'scheduled' ? 'Notification scheduled. Recipients are calculated when it is delivered.' : `Notification delivered to ${row.recipient_count} member(s).` } });
     };
     // Reusing the verified UUID hits the same outbox row. The unique primary key

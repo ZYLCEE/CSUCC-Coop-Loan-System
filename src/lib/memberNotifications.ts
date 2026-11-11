@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { hasAdminPrivilege } from "@/lib/adminPrivileges";
+import type { DateSortOrder } from "./tablePagination";
 
 export type OutgoingStatus = "all" | "sent" | "scheduled" | "failed";
 export interface OutgoingNotification {
@@ -14,7 +15,7 @@ export interface OutgoingNotification {
   scheduledAt: string | null;
 }
 
-export async function fetchOutgoingNotifications(userId: string, status: OutgoingStatus, search = "", offset = 0) {
+export async function fetchOutgoingNotifications(userId: string, status: OutgoingStatus, search = "", offset = 0, pageSize = 20, sortOrder: DateSortOrder = "Newest") {
   const client = getSupabaseClient();
   const { data: sessionData, error: sessionError } = await client.auth.getUser();
   const user = sessionData.user;
@@ -29,8 +30,9 @@ export async function fetchOutgoingNotifications(userId: string, status: Outgoin
     .is("user_id", null).not("send_to", "is", null);
   if (status !== "all") query = query.eq("status", status);
   if (search.trim()) query = query.ilike("title", `%${search.trim().slice(0, 160).replace(/[\\%_]/g, (character) => `\\${character}`)}%`);
-  const { data, count, error } = await query.order("created_at", { ascending: false })
-    .order("id", { ascending: false }).range(offset, offset + 19);
+  const ascending = sortOrder === "Oldest";
+  const { data, count, error } = await query.order("created_at", { ascending })
+    .order("id", { ascending }).range(offset, offset + pageSize - 1);
   if (error || !Array.isArray(data) || count === null || !Number.isSafeInteger(count) || count < 0) {
     throw new Error("Outgoing delivery history is unavailable. The notification service must provide recorded recipient, schedule, and delivery statuses. Your incoming alerts remain separate in the top bell.");
   }

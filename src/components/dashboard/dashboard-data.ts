@@ -3,7 +3,7 @@ import { fetchAdminAccounts } from "@/lib/adminAccounts";
 import { countActiveMembers, type DashboardLoan } from "./dashboard-model";
 
 const statuses: Record<string, DashboardLoan["status"]> = {
-  pending: "Pending", "under review": "Under Review", approved: "Approved",
+  pending: "Pending", returned: "Returned", "under review": "Pending", approved: "Approved",
   rejected: "Rejected", released: "Released", completed: "Completed", overdue: "Overdue",
 };
 
@@ -62,7 +62,7 @@ export async function fetchDashboardLoans(): Promise<DashboardLoan[]> {
   let offset = 0;
   do {
     const { data, error, count } = await client.from("loan_applications")
-      .select("application_id,member_name,loan_type,amount,status,date_submitted,date_approved,date_released,created_at,members(member_id,first_name,last_name)", { count: "exact" })
+      .select("application_id,member_name,loan_type,amount,status,date_submitted,date_approved,date_released,created_at,members:members!loan_applications_member_id_fkey(member_id,first_name,last_name)", { count: "exact" })
       .order("date_submitted", { ascending: false })
       .order("created_at", { ascending: false })
       .order("application_id", { ascending: true })

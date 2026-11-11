@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { useState } from "react";
 import { Database, Download, RotateCcw } from "lucide-react";
 
@@ -13,35 +14,28 @@ interface BackupRecord {
 
 export default function Backup() {
   const [showRestoreModal, setShowRestoreModal] = useState(false);
-  const [selectedBackup, setSelectedBackup] = useState<BackupRecord | null>(null);
 
   const [backups] = useState<BackupRecord[]>([]);
 
   const handleBackupNow = () => {
-    console.log("Starting database backup");
+    // No connected backup API.
   };
 
   const handleDownload = () => {
-    console.log("Downloading latest backup");
+    // No connected backup download API.
   };
 
-  const handleRestore = (backup: BackupRecord) => {
-    setSelectedBackup(backup);
+  const handleRestore = () => {
     setShowRestoreModal(true);
   };
 
-  const confirmRestore = () => {
-    setShowRestoreModal(false);
-    console.log("Restoring backup:", selectedBackup?.id);
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <section className="space-y-3"><p role="note" className="text-support text-portal-muted">Legacy preview: these controls are unavailable and do not save changes. Use the current portal settings.</p><fieldset disabled><div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Database Backup Card */}
       <div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-5">
         <h2 className="text-[20px] font-bold text-[#1F2937] mb-2">Database Backup</h2>
         <p className="text-[14px] text-[#6B7280] mb-4">
-          Create a full backup of the system database. Backups are encrypted and stored securely.
+          Backup creation and restoration are unavailable in this legacy preview. Use the connected portal settings and Supabase backup tools.
         </p>
 
         {/* Last Backup Card */}
@@ -97,7 +91,7 @@ export default function Backup() {
                     <Download className="w-4 h-4 text-[#6B7280]" />
                   </button>
                   <button
-                    onClick={() => handleRestore(backup)}
+                    onClick={() => handleRestore()}
                     className="p-2 hover:bg-[#F9FAFB] rounded-full transition-colors"
                   >
                     <RotateCcw className="w-4 h-4 text-[#6B7280]" />
@@ -112,31 +106,8 @@ export default function Backup() {
         </div>
       </div>
 
-      {/* Restore Confirmation Modal */}
-      {showRestoreModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] w-full max-w-md p-6">
-            <h2 className="text-[20px] font-bold text-[#1F2937] mb-2">Restore Database Backup</h2>
-            <p className="text-[15px] text-[#6B7280] mb-6">
-              Restoring a backup will replace the current database with the selected backup. This action cannot be undone.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowRestoreModal(false)}
-                className="px-4 h-10 bg-white border border-[#E5E7EB] rounded-[10px] text-[15px] font-medium text-[#1F2937] hover:bg-[#F9FAFB]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={confirmRestore}
-                className="px-4 h-10 bg-[#EF4444] rounded-[10px] text-[15px] font-medium text-white hover:bg-[#DC2626]"
-              >
-                Restore
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {showRestoreModal && <ConfirmActionDialog title="Restore database backup" tone="destructive" question="This legacy preview has no connected service. No operation will be performed." confirmLabel="Unavailable" disabled onClose={() => setShowRestoreModal(false)} onConfirm={() => {}} />}
+
+    </div></fieldset></section>
   );
 }

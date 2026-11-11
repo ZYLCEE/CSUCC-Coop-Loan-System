@@ -1,0 +1,77 @@
+CREATE FUNCTION pg_temp.verify_action(actor integer,application text,operation text,payload jsonb DEFAULT '{}') RETURNS jsonb LANGUAGE plpgsql AS $$
+DECLARE app uuid; rev integer; hash text;
+BEGIN
+ SELECT id INTO STRICT app FROM public.loan_applications WHERE application_id=application;
+ SELECT coalesce((SELECT revision FROM public.application_verifications WHERE application_id=app),0) INTO rev;
+ hash:=public.private_application_verification_state(app)->>'stateHash';
+ RETURN public.application_workflow_action(pg_temp.actor(actor),jsonb_build_object('applicationId',application,'revision',rev,'stateHash',hash,'operation',operation,'payload',payload,'requestId',gen_random_uuid()));
+END$$;
+
+-- Committee provisioning is independent of policy activation and needs no email send.
+DO $$DECLARE request uuid:=gen_random_uuid(); attempt uuid:=gen_random_uuid(); payload jsonb; result jsonb;
+BEGIN
+ PERFORM set_config('request.jwt.claim.sub',pg_temp.actor(1)::text,true);
+ payload:=jsonb_build_object('name','Synthetic BOD','email','new-bod@example.invalid','role','bod_member','committeeSeat','chairperson','title','','startsAt',now(),'endsAt',null,'provisioningMode','password');
+ PERFORM public.committee_reserve_invite(request,attempt,payload);
+ INSERT INTO auth.users(id,email,email_confirmed_at,encrypted_password,raw_app_meta_data,raw_user_meta_data)
+ VALUES(pg_temp.actor(14),'new-bod@example.invalid',now(),'synthetic-only',jsonb_build_object('role','bod_member','account_status','active','committee_invitation_request_id',request),'{}');
+ result:=public.committee_finish_invite(request,attempt,pg_temp.actor(14));
+ PERFORM pg_temp.assert_true((SELECT setup_completed_at IS NULL FROM public.staff_memberships WHERE id=(result->>'membershipId')::uuid),'created account requires personal password setup');
+END$$;
+SELECT public.committee_review_action(pg_temp.actor(1),'activate_policy',jsonb_build_object('policyId','90000000-0000-0000-0000-000000000001','rules','{"crecomApprovals":3,"bodReviewers":1,"bodApprovals":1,"bodAuthority":"recommendation","finalMode":"authorized_admin","allowOverride":false,"allResponses":true,"ruleReference":"SYNTHETIC AGREED WORKFLOW","signatoryLayout":"manual_form_v1"}'::jsonb,'requestId',gen_random_uuid()));
+UPDATE auth.users SET raw_app_meta_data=jsonb_set(raw_app_meta_data,'{admin_privileges}','["applications.forward","applications.verify","applications.return","applications.finalize"]') WHERE id=pg_temp.actor(2);
+SELECT pg_temp.seed_app('AGREED-RETURN');
+SELECT pg_temp.send(2,'AGREED-RETURN','forward',pg_temp.payload_reviewers(7,8,9));
+SELECT pg_temp.respond(7,'AGREED-RETURN','approve');
+SELECT pg_temp.assert_true(NOT EXISTS(SELECT 1 FROM public.application_review_cycles c JOIN public.loan_applications a ON a.id=c.application_id WHERE a.application_id='AGREED-RETURN' AND c.stage='BOD'),'BOD receives nothing before all three approvals');
+SELECT pg_temp.respond(8,'AGREED-RETURN','reject');
+SELECT pg_temp.assert_true(public.committee_application_stage((SELECT id FROM public.loan_applications WHERE application_id='AGREED-RETURN'))='review_attention','one rejection stops progression');
+SELECT pg_temp.denied($q$SELECT pg_temp.respond(9,'AGREED-RETURN','approve')$q$,'40001');
+SELECT pg_temp.denied($q$SELECT pg_temp.send(2,'AGREED-RETURN','forward_bod',jsonb_build_object('reviewers',jsonb_build_array(pg_temp.member(11)),'dueAt',null))$q$,'P0001');
+SELECT pg_temp.verify_action(2,'AGREED-RETURN','return','{"category":"information","reason":"Correct the loan purpose and resubmit.","affectedKinds":[]}');
+SELECT pg_temp.assert_true((SELECT status='returned' FROM public.loan_applications WHERE application_id='AGREED-RETURN'),'return changes main loan status');
+SELECT pg_temp.assert_true((SELECT count(*)=1 AND bool_and(status='queued') FROM public.application_email_outbox),'return queues one unsent email');
+SELECT pg_temp.assert_true(EXISTS(SELECT 1 FROM public.notifications WHERE user_id=pg_temp.actor(4) AND message LIKE '%Correct the loan purpose%'),'member receives return instructions');
+SET LOCAL ROLE authenticated;
+SELECT set_config('request.jwt.claim.sub',pg_temp.actor(1)::text,true);
+SELECT pg_temp.denied($q$SELECT public.application_workflow_action(pg_temp.actor(1),'{}')$q$,'42501');
+SELECT pg_temp.denied($q$SELECT public.mutate_application_verification('AGREED-RETURN','return',1,'a','{}',gen_random_uuid())$q$,'42501');
+SELECT set_config('request.jwt.claim.sub',pg_temp.actor(5)::text,true);
+SELECT pg_temp.denied($q$SELECT public.resubmit_returned_loan('AGREED-RETURN',gen_random_uuid(),'{}')$q$,'P0002');
+SELECT set_config('request.jwt.claim.sub',pg_temp.actor(4)::text,true);
+SELECT public.resubmit_returned_loan('AGREED-RETURN',gen_random_uuid(),'{"purpose":"Corrected purpose"}');
+RESET ROLE;
+SELECT pg_temp.assert_true((SELECT status='pending' AND purpose='Corrected purpose' FROM public.loan_applications WHERE application_id='AGREED-RETURN'),'owner resubmission becomes Pending');
+SELECT pg_temp.assert_true((SELECT stage='needs_verification' AND checks='{"identity":false,"eligibility":false,"terms":false}'::jsonb AND verified_state_hash IS NULL FROM public.application_verifications WHERE application_id=(SELECT id FROM public.loan_applications WHERE application_id='AGREED-RETURN')),'resubmission resets all requirements checks');
+SELECT pg_temp.assert_true((SELECT count(*)=2 FROM public.individual_review_decisions),'previous confirmations remain immutable in history');
+SELECT pg_temp.denied($q$SELECT pg_temp.send(2,'AGREED-RETURN','forward',pg_temp.payload_reviewers(7,8,9))$q$,'P0001');
+SELECT pg_temp.verify_action(2,'AGREED-RETURN','save_draft','{"checks":{"identity":true,"eligibility":true,"terms":true},"notes":"Fresh check after resubmission"}');
+SELECT pg_temp.verify_action(2,'AGREED-RETURN','mark_verified');
+SELECT pg_temp.send(2,'AGREED-RETURN','forward',pg_temp.payload_reviewers(7,8,9));
+SELECT pg_temp.respond(7,'AGREED-RETURN','approve');
+SELECT pg_temp.respond(8,'AGREED-RETURN','approve');
+SELECT pg_temp.respond(9,'AGREED-RETURN','approve');
+SELECT pg_temp.assert_true(public.committee_application_stage((SELECT id FROM public.loan_applications WHERE application_id='AGREED-RETURN'))='bod_review','all three approvals automatically create the BOD assignment');
+SELECT pg_temp.denied($q$SELECT pg_temp.send(2,'AGREED-RETURN','finalize','{"decision":"approve","reason":"Too early"}')$q$,'P0001');
+SELECT pg_temp.respond(11,'AGREED-RETURN','approve','BOD');
+SELECT pg_temp.send(2,'AGREED-RETURN','finalize','{"decision":"approve","reason":"All four confirmed after fresh requirements review."}');
+SELECT pg_temp.assert_true((SELECT status='approved' FROM public.loan_applications WHERE application_id='AGREED-RETURN'),'authorized Admin final approval follows four fresh decisions');
+SELECT pg_temp.denied($q$SELECT public.loan_release_action(pg_temp.actor(2),jsonb_build_object('applicationId','AGREED-RETURN','requestId',gen_random_uuid(),'date',current_date,'reference','SYNTHETIC-DV-1','amount',1000,'notes','Checked voucher'))$q$,'42501');
+UPDATE auth.users SET raw_app_meta_data=jsonb_set(raw_app_meta_data,'{admin_privileges}',(raw_app_meta_data->'admin_privileges')||'"loans.release"'::jsonb) WHERE id=pg_temp.actor(2);
+SELECT public.loan_release_action(pg_temp.actor(2),jsonb_build_object('applicationId','AGREED-RETURN','requestId',gen_random_uuid(),'date',current_date,'reference','SYNTHETIC-DV-1','amount',1000,'notes','Checked voucher'));
+SELECT pg_temp.assert_true((SELECT status='released' AND released_by=pg_temp.actor(2) AND processing_fee_amount_at_release=10 AND service_fee_amount_at_release=5 FROM public.loan_applications WHERE application_id='AGREED-RETURN'),'separate authorized release preserves existing fee calculations');
+SELECT pg_temp.seed_app('AGREED-UNAUTHORIZED');
+SELECT set_config('request.jwt.claim.sub',pg_temp.actor(1)::text,true);
+SELECT pg_temp.denied($q$UPDATE public.loan_applications SET status='approved' WHERE application_id='AGREED-UNAUTHORIZED'$q$,'42501');
+SELECT pg_temp.seed_app('AGREED-MISSING');
+DELETE FROM public.loan_documents WHERE loan_application_id=(SELECT id FROM public.loan_applications WHERE application_id='AGREED-MISSING') AND kind='validId';
+SELECT pg_temp.verify_action(2,'AGREED-MISSING','return','{"category":"information","reason":"Upload your missing valid ID.","affectedKinds":[]}');
+SELECT set_config('request.jwt.claim.sub',pg_temp.actor(4)::text,true);
+SELECT pg_temp.denied($q$SELECT public.resubmit_returned_loan('AGREED-MISSING',gen_random_uuid(),'{}')$q$,'P0001');
+INSERT INTO storage.objects(bucket_id,name,metadata) VALUES('loan-documents',pg_temp.actor(4)::text||'/corrections/id.pdf','{"mimetype":"application/pdf","size":10}');
+SELECT public.submit_missing_application_document('AGREED-MISSING','validId',pg_temp.actor(4)::text||'/corrections/id.pdf','id.pdf','application/pdf',10);
+SELECT public.resubmit_returned_loan('AGREED-MISSING',gen_random_uuid(),'{}');
+SET LOCAL ROLE authenticated;
+SELECT pg_temp.denied($q$SELECT public.release_approved_loan('AGREED-MISSING',gen_random_uuid(),current_date,'FORGED',1000,'')$q$,'42501');
+RESET ROLE;
+SELECT 'PASS: personal setup, strict 3+1 routing, rejection stop, Returned notices/outbox, owner resubmission, fresh confirmations and staff final authorization' AS result;

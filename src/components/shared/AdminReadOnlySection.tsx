@@ -13,8 +13,11 @@ export default function AdminReadOnlySection({
 }) {
   const { role, can } = useAdminAuth();
   const granted = (section === "settings" && can("settings.manage")) ||
-    (["system-management", "documents"].includes(section) && (can("documents.upload") || can("documents.delete"))) ||
-    (["communication", "notifications"].includes(section) && can("notifications.send"));
+    (section==="committee-accounts"&&can("committee.accounts.manage")) ||
+    (section === "settings" && can("workflow.policy.manage")) ||
+    (section === "loan-applications" && (can("applications.verify") || can("applications.return"))) ||
+    (["system-management", "documents"].includes(section) && (can("documents.review") || can("documents.upload") || can("documents.delete"))) ||
+    (["communication", "notifications"].includes(section));
 
   return (
     <>

@@ -1,32 +1,40 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Banknote, Eye, History, MoreVertical } from "lucide-react";
+import { navigateRecordMenu, recordMenuPosition } from "./recordMenu";
 
 interface RecordActionsMenuProps {
   label: string;
   onView: () => void;
   onPayment?: () => void;
+  onRepayments?: () => void;
   canRecordPayment?: boolean;
 }
 
-export default function RecordActionsMenu({ label, onView, onPayment, canRecordPayment = false }: RecordActionsMenuProps) {
+export default function RecordActionsMenu({ label, onView, onPayment, onRepayments, canRecordPayment = false }: RecordActionsMenuProps) {
   const menuId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const anchorBounds = useRef<DOMRect | null>(null);
+  const [position, setPosition] = useState<ReturnType<typeof recordMenuPosition> | null>(null);
 
   useEffect(() => {
     if (!position) return;
-    menu.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+    menu.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
     const dismiss = (event: PointerEvent) => {
       const target = event.target as Node;
       if (!menu.current?.contains(target) && !trigger.current?.contains(target)) setPosition(null);
     };
     const close = () => setPosition(null);
     const onScroll = (event: Event) => {
-      if (!(event.target instanceof Node) || !menu.current?.contains(event.target)) close();
+      if (event.target instanceof Node && menu.current?.contains(event.target)) return;
+      const before = anchorBounds.current;
+      const after = trigger.current?.getBoundingClientRect();
+      // A queued scroll event can arrive after the trigger has already scrolled into view.
+      // Keep the menu when its anchor has not moved since opening.
+      if (!before || !after || Math.abs(after.top - before.top) > 0.5 || Math.abs(after.left - before.left) > 0.5) close();
     };
     document.addEventListener("pointerdown", dismiss);
     window.addEventListener("resize", close);
@@ -39,26 +47,9 @@ export default function RecordActionsMenu({ label, onView, onPayment, canRecordP
   }, [position]);
 
   const openMenu = () => {
-    const rect = trigger.current?.getBoundingClientRect();
-    if (!rect) return;
-    const height = onPayment ? 100 : 56;
-    setPosition({
-      left: Math.max(12, Math.min(rect.right - 200, window.innerWidth - 212)),
-      top: rect.bottom + height + 8 <= window.innerHeight ? rect.bottom + 6 : Math.max(12, rect.top - height - 6),
-    });
-  };
-
-  const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    const items = Array.from(menu.current?.querySelectorAll<HTMLButtonElement>('[role="menuitem"]') ?? []);
-    const current = items.indexOf(document.activeElement as HTMLButtonElement);
-    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      event.preventDefault();
-      const index = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1 : (current + (event.key === "ArrowDown" ? 1 : -1) + items.length) % items.length;
-      items[index]?.focus();
-    } else if (event.key === "Escape" || event.key === "Tab") {
-      if (event.key === "Escape") event.preventDefault();
-      setPosition(null);
-      trigger.current?.focus();
+    if (trigger.current) {
+      anchorBounds.current = trigger.current.getBoundingClientRect();
+      setPosition(recordMenuPosition(trigger.current, 200, 12 + (1 + Number(!!onPayment) + Number(!!onRepayments)) * 36));
     }
   };
 
@@ -67,21 +58,25 @@ export default function RecordActionsMenu({ label, onView, onPayment, canRecordP
     trigger.current?.focus();
     action();
   };
-  const itemClass = "flex min-h-10 w-full items-center gap-2.5 rounded-md px-3 py-2 text-left text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#155D3B]/30";
+  const itemClass = "ui-button ui-button--ghost ui-button--compact w-full justify-start text-start";
 
   return <>
     <button ref={trigger} type="button" aria-label={`Open actions for ${label}`} aria-haspopup="menu" aria-expanded={!!position} aria-controls={position ? menuId : undefined}
-      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-colors hover:border-[#155D3B]/40 hover:bg-[#F0F7F3] hover:text-[#155D3B] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#155D3B]"
+      className="ui-icon-button"
       onClick={() => position ? setPosition(null) : openMenu()}
       onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); openMenu(); } }}>
-      <MoreVertical className="h-[18px] w-[18px]" aria-hidden="true" />
+      <MoreVertical className="size-icon" aria-hidden="true" />
     </button>
-    {position && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={`Actions for ${label}`} onKeyDown={handleKeyDown}
-      style={position} className="fixed z-[70] w-[200px] rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.16)]">
-      <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onView)} className={`${itemClass} text-slate-700 hover:bg-slate-50 hover:text-[#155D3B]`}>
+    {position && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={`Actions for ${label}`}
+      onKeyDown={event => navigateRecordMenu(event, () => { setPosition(null); trigger.current?.focus({ preventScroll: true }); })}
+      style={position} className="ui-card fixed z-[70] w-[200px] overflow-y-auto p-1 shadow-portal-dropdown">
+      <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onView)} className={itemClass}>
         <Eye className="h-4 w-4" aria-hidden="true" />View details
       </button>
-      {onPayment && <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onPayment)} className={`${itemClass} text-[#155D3B] hover:bg-[#F0F7F3]`}>
+      {onRepayments && <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onRepayments)} className={itemClass}>
+        <History className="h-4 w-4" aria-hidden="true" />Repayment details
+      </button>}
+      {onPayment && <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onPayment)} className={`${itemClass} text-coop-dashboard-green`}>
         {canRecordPayment ? <><Banknote className="h-4 w-4" aria-hidden="true" />Record payment</> : <><History className="h-4 w-4" aria-hidden="true" />Payment history</>}
       </button>}
     </div>, document.body)}

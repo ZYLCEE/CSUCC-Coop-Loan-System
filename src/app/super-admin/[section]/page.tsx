@@ -11,8 +11,10 @@ import ReportsPage from "@/app/(admin)/reports/page";
 import AuditLogsPage from "@/app/(admin)/audit-logs/page";
 import SettingsPage from "@/app/(admin)/settings/page";
 import ProfilePage from "@/app/(admin)/profile/page";
+import CommitteeAccounts from "@/components/committee/CommitteeAccounts";
 
 const pages: Record<string, ComponentType> = {
+  "committee-accounts": CommitteeAccounts,
   dashboard: DashboardPage,
   "loan-applications": LoanApplicationsPage,
   "all-accounts": MembersPage,
@@ -25,6 +27,7 @@ const pages: Record<string, ComponentType> = {
   documents: DocumentsPage,
   reports: ReportsPage,
   "audit-logs": AuditLogsPage,
+  "active-logs": AuditLogsPage,
   settings: SettingsPage,
   profile: ProfilePage,
 };

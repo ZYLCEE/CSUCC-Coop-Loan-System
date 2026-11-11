@@ -1,0 +1,11 @@
+import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
+const read=path=>readFileSync(path,"utf8").replaceAll("\r\n","\n");
+let setup=read("supabase/tests/committee-review-cases.sql").split("SET LOCAL ROLE authenticated;")[0];
+setup=setup.replace('"bodMode":"none"','"bodMode":"required"').replace("SYNTHETIC NO BOD","SYNTHETIC FOUR POSITIONS").replace("bod boolean DEFAULT false","bod boolean DEFAULT true").replace('"bodCriteria":""','"bodCriteria":"BOD chairperson required for every loan"');
+setup+="\nUPDATE public.staff_memberships SET committee_seat='chairperson' WHERE auth_user_id IN (pg_temp.actor(9),pg_temp.actor(10),pg_temp.actor(11));\n";
+setup+="INSERT INTO auth.users(id,email,raw_app_meta_data,raw_user_meta_data,email_confirmed_at,encrypted_password) VALUES(pg_temp.actor(12),'review-12@example.invalid','{\"role\":\"crecom_member\",\"account_status\":\"active\"}','{\"full_name\":\"Synthetic reviewer 12\"}',now(),'synthetic-hash');\n";
+setup+="INSERT INTO public.staff_memberships(id,auth_user_id,role,starts_at,setup_completed_at,assigned_by) VALUES(pg_temp.member(12),pg_temp.actor(12),'crecom_member',now()-interval '1 day',now(),pg_temp.actor(1));\n";
+const sources=["supabase/tests/document-workspace-bootstrap.sql","supabase/tests/application-verification-bootstrap.sql","supabase/migrations/20261110_document_workspace.sql","supabase/migrations/20261110_application_verification.sql","supabase/migrations/20261110_committee_access.sql","supabase/migrations/20261111_committee_review.sql","supabase/migrations/20261111_committee_signatories.sql"];
+mkdirSync("docs/committee-signatories",{recursive:true});
+writeFileSync("docs/committee-signatories/staging-rollback-test.sql","BEGIN;\n"+sources.map(path=>read(path).replace(/^BEGIN;\s*$/m,"").replace(/^COMMIT;\s*$/m,"")).join("\n")+"\nALTER TABLE public.loan_applications ADD COLUMN date_approved date,ADD COLUMN co_maker_member_id uuid REFERENCES public.members(id);\n"+setup+read("supabase/tests/committee-signatories-cases.sql")+"\nROLLBACK;\n");
+console.log("Prepared four-position staging tests. Every synthetic record ends in ROLLBACK.");

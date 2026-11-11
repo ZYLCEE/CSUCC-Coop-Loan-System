@@ -1,76 +1,76 @@
 "use client";
 
+import { navigateRecordMenu, recordMenuPosition } from "@/components/shared/recordMenu";
+import { DataTable } from "@/components/ui/DataTable";
+import { EmptyState } from "@/components/ui/Feedback";
+
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   Ban,
   Eye,
+  KeyRound,
   MoreVertical,
   Pencil,
   Trash2,
   Unlock,
+  UserRoundCog,
 } from "lucide-react";
 import { Member } from "./MembersData";
 import RoleBadge from "./RoleBadge";
+import {formatAccountNumber} from "@/lib/accountPresentation";
 import StatusBadge from "./StatusBadge";
 import MembershipTypeBadge from "@/components/shared/MembershipTypeBadge";
-import MembersPagination from "./MembersPagination";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
+import { accountActions } from "./accountActions";
 
 interface MembersTableProps {
   members: Member[];
-  currentPage: number;
-  totalPages: number;
-  totalItems: number;
-  showingFrom: number;
-  showingTo: number;
   readOnly?: boolean;
-  onPageChange: (page: number) => void;
   onViewMember: (member: Member) => void;
   onEditMember: (member: Member) => void;
   onToggleBlockStatus: (member: Member) => void;
   onDeleteMember: (member: Member) => void;
+  onResetPassword: (member: Member) => void;
+  onManagePrivileges: (member: Member) => void;
 }
 
-interface ActionMenuState {
-  idNumber: string;
-  top: number;
-  left: number;
-}
+type ActionMenuState = ReturnType<typeof recordMenuPosition> & { idNumber: string };
 
-const getDisplayIdNumber = (idNumber: string) => idNumber;
+const menuItem = "ui-button ui-button--ghost min-h-11 w-full justify-start gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-portal-primary hover:bg-surface-muted";
+const menuIcon = "h-5 w-5 shrink-0 text-portal-muted";
+const protectedMessage = "Super Admin account changes are restricted in COOP.";
+const getDisplayIdNumber = formatAccountNumber;
 
 export default function MembersTable({
   members,
-  currentPage,
-  totalPages,
-  totalItems,
-  showingFrom,
-  showingTo,
   readOnly = false,
-  onPageChange,
   onViewMember,
   onEditMember,
   onToggleBlockStatus,
   onDeleteMember,
+  onResetPassword,
+  onManagePrivileges,
 }: MembersTableProps) {
   const router = useRouter();
-  const { user } = useAdminAuth();
+  const { user, role } = useAdminAuth();
   const [openMenu, setOpenMenu] = useState<ActionMenuState | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
+  const menuTrigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (openMenu) menuRef.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus({ preventScroll: true });
+  }, [openMenu]);
   const selectedMember = openMenu
     ? members.find((member) => (member.accountKey ?? member.idNumber) === openMenu.idNumber)
     : null;
 
-  const isCurrentActiveSuperAdmin = (member: Member) =>
-    (member.role === "Super Admin" || member.role === "Super Administrator") &&
-    member.status === "Active" &&
-    user?.app_metadata.role === "super_admin" &&
-    (member.authUserId === user.id ||
-      member.email.toLowerCase() === (user.email ?? "").toLowerCase());
-
-  const handleDeleteMember = (member: Member) => {
-    onDeleteMember(member);
+  const actions = selectedMember ? accountActions(selectedMember, user?.id, role, readOnly) : null;
+  const choose = (callback: (member: Member) => void) => {
+    if (!selectedMember) return;
+    menuTrigger.current?.focus({ preventScroll: true });
+    setOpenMenu(null);
+    callback(selectedMember);
   };
 
   useEffect(() => {
@@ -93,17 +93,20 @@ export default function MembersTable({
     };
 
     const closeOnViewportChange = () => setOpenMenu(null);
+    const closeOnScroll = (event: Event) => {
+      if (!(event.target instanceof Node) || !menuRef.current?.contains(event.target)) closeOnViewportChange();
+    };
 
     document.addEventListener("mousedown", handlePointerDown);
     document.addEventListener("keydown", handleEscape);
     window.addEventListener("resize", closeOnViewportChange);
-    window.addEventListener("scroll", closeOnViewportChange, true);
+    window.addEventListener("scroll", closeOnScroll, true);
 
     return () => {
       document.removeEventListener("mousedown", handlePointerDown);
       document.removeEventListener("keydown", handleEscape);
       window.removeEventListener("resize", closeOnViewportChange);
-      window.removeEventListener("scroll", closeOnViewportChange, true);
+      window.removeEventListener("scroll", closeOnScroll, true);
     };
   }, []);
 
@@ -117,54 +120,51 @@ export default function MembersTable({
       return;
     }
 
-    const rect = event.currentTarget.getBoundingClientRect();
-    const menuWidth = 214;
+    menuTrigger.current = event.currentTarget;
 
     setOpenMenu({
       idNumber: accountKey,
-      top: rect.bottom + 6,
-      left: Math.max(12, Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 12)),
+      ...recordMenuPosition(event.currentTarget, 250, 280),
     });
   };
 
   return (
     <div className="relative">
-      <div className="overflow-x-auto border-t border-[#E5E7EB]">
-        <table className="w-full min-w-[1050px] table-fixed">
+      <DataTable label="Accounts table" density="compact" className="min-w-[1000px] table-fixed">
           <colgroup>
+              <col className="w-[14%]" />
+              <col className="w-[14%]" />
+              <col className="w-[20%]" />
               <col className="w-[11%]" />
-              <col className="w-[18%]" />
-              <col className="w-[18%]" />
-              <col className="w-[13%]" />
               <col className="w-[12%]" />
-              <col className="w-[10%]" />
-              <col className="w-[10%]" />
+              <col className="w-[14%]" />
               <col className="w-[8%]" />
+              <col className="w-[7%]" />
           </colgroup>
           <thead>
-            <tr className="h-11 border-b border-[#E5E7EB] bg-[#F8FAFC]">
-              <th className="px-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+            <tr>
+              <th scope="col">
                 ID Number
               </th>
-              <th className="px-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col">
                 Full Name
               </th>
-              <th className="px-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col">
                 Email Address
               </th>
-              <th className="px-3 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col">
               Role
               </th>
-              <th className="px-3 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col">
                 Membership Type
               </th>
-              <th className="px-3 text-left text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col">
               Department
               </th>
-              <th className="px-3 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col">
                 Status
               </th>
-              <th className="px-3 text-center text-[10px] font-semibold uppercase tracking-wide text-[#64748B]">
+              <th scope="col" className="text-center">
                 Actions
               </th>
             </tr>
@@ -174,24 +174,23 @@ export default function MembersTable({
               members.map((member) => (
                 <tr
                   key={member.accountKey ?? member.idNumber}
-                  className="h-[62px] border-b border-[#E5E7EB] transition-colors last:border-b-0 hover:bg-[#F8FAFC]"
                 >
-                  <td className="truncate whitespace-nowrap px-3 text-[13px] font-semibold text-[#155D3B]" title={member.idNumber}>
+                  <td className="whitespace-normal text-body font-semibold text-coop-dashboard-green [overflow-wrap:anywhere]" title={member.idNumber}>
                     {member.idNumber ? getDisplayIdNumber(member.idNumber) : "N/A"}
                   </td>
-                  <td className="truncate whitespace-nowrap px-3 text-[13px] font-semibold text-[#0F172A]" title={member.fullName}>
+                  <td className="whitespace-normal text-body font-semibold text-portal-primary [overflow-wrap:anywhere]" title={member.fullName}>
                     {member.fullName || "Not recorded"}
                     {member.integrityIssue && (
-                      <span className="mt-1 block truncate text-[10px] font-medium text-[#92400E]" title={member.integrityIssue}>
+                      <span className="mt-1 block truncate text-caption font-medium text-status-warning" title={member.integrityIssue}>
                         Data integrity issue
                       </span>
                     )}
                   </td>
-                  <td className="truncate whitespace-nowrap px-3 text-[13px] font-normal text-[#334155]" title={member.email}>
+                  <td className="whitespace-normal text-body font-normal text-portal-primary [overflow-wrap:anywhere]" title={member.email}>
                     {member.email ? (
                       <a
                         href={`mailto:${member.email}`}
-                        className="block truncate transition-colors hover:text-[#155D3B]"
+                        className="block transition-colors hover:text-coop-dashboard-green"
                       >
                         {member.email}
                       </a>
@@ -199,148 +198,61 @@ export default function MembersTable({
                       "Not recorded"
                     )}
                   </td>
-                  <td className="px-2 text-center">
+                  <td>
                     <RoleBadge role={member.role} />
                   </td>
-                  <td className="px-2 text-center">
+                  <td>
                     {member.role === "Member" ? (
                       <MembershipTypeBadge membershipType={member.membershipType} />
                     ) : (
-                      <span className="text-[12px] text-[#64748B]">N/A</span>
+                      <span className="text-caption text-portal-secondary">N/A</span>
                     )}
                   </td>
-                  <td className="truncate whitespace-nowrap px-3 text-[13px] font-normal text-[#334155]" title={member.department}>
+                  <td className="truncate text-body font-normal text-portal-primary" title={member.department}>
                     {member.role === "Member" ? member.department || "N/A" : "N/A"}
                   </td>
-                  <td className="px-3 text-center">
+                  <td>
                     <StatusBadge status={member.status} />
                   </td>
-                  <td className="px-3">
+                  <td>
                     <div className="flex justify-center">
                       <button
                         type="button"
                         data-member-action-button="true"
                         onClick={(event) => handleActionButtonClick(member, event)}
-                        className="flex h-[34px] w-[34px] items-center justify-center rounded-[8px] border border-[#D1D5DB] bg-white text-[#64748B] transition-colors hover:border-[#155D3B] hover:bg-[#F8FAFC] hover:text-[#155D3B] focus:outline-none focus:ring-2 focus:ring-[#155D3B]/20"
+                        className="ui-icon-button"
                         aria-label={`Open actions for ${member.fullName}`}
+                        aria-haspopup="menu"
                         aria-expanded={openMenu?.idNumber === (member.accountKey ?? member.idNumber)}
                       >
-                        <MoreVertical className="h-[18px] w-[18px]" />
+                        <MoreVertical className="size-icon" aria-hidden="true" />
                       </button>
                     </div>
                   </td>
                 </tr>
               ))
-            ) : (
-              <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-[14px] text-[#64748B]">
-                  No accounts found.
-                </td>
-              </tr>
-            )}
+            ) : null}
           </tbody>
-        </table>
-      </div>
+      </DataTable>
+      {!members.length && <EmptyState title="No accounts found." description={"Try changing your search or filters."} />}
 
-      <MembersPagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        totalItems={totalItems}
-        showingFrom={showingFrom}
-        showingTo={showingTo}
-        onPageChange={onPageChange}
-      />
-
-      {openMenu && selectedMember && (
-        <div
-          ref={menuRef}
-          style={{ top: openMenu.top, left: openMenu.left }}
-          className="fixed z-[60] w-[214px] rounded-[10px] border border-[#E5E7EB] bg-white py-1.5 shadow-[0_12px_30px_rgba(15,23,42,0.16)]"
-          role="menu"
-        >
-          <button
-            type="button"
-            onClick={() => {
-              onViewMember(selectedMember);
-              setOpenMenu(null);
-            }}
-            className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-medium text-[#374151] transition-colors hover:bg-[#F8FAFC] hover:text-[#155D3B]"
-            role="menuitem"
-          >
-            <Eye className="h-4 w-4" />
-            View Details
-          </button>
-          {isCurrentActiveSuperAdmin(selectedMember) ? (
-            <button
-              type="button"
-              onClick={() => {
-                router.push(
-                  window.location.pathname.startsWith("/super-admin/")
-                    ? "/super-admin/profile"
-                    : "/profile"
-                );
-                setOpenMenu(null);
-              }}
-              className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-medium text-[#374151] transition-colors hover:bg-[#F8FAFC] hover:text-[#155D3B]"
-              role="menuitem"
-            >
-              <Pencil className="h-4 w-4" />
-              Edit My Account
-            </button>
-          ) : (
-            !readOnly &&
-            selectedMember.profileLinked &&
-            selectedMember.role !== "Unknown" &&
-            selectedMember.role !== "Super Admin" &&
-            selectedMember.role !== "Super Administrator" && (
-            <>
-              <button
-                type="button"
-                onClick={() => {
-                  onEditMember(selectedMember);
-                  setOpenMenu(null);
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-medium text-[#374151] transition-colors hover:bg-[#F8FAFC] hover:text-[#155D3B]"
-                role="menuitem"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit Account
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onToggleBlockStatus(selectedMember);
-                  setOpenMenu(null);
-                }}
-                className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-medium transition-colors ${
-                  selectedMember.status === "Blocked"
-                    ? "text-[#047857] hover:bg-[#ECFDF5] hover:text-[#155D3B]"
-                    : "text-[#B91C1C] hover:bg-[#FEF2F2] hover:text-[#991B1B]"
-                }`}
-                role="menuitem"
-              >
-                {selectedMember.status === "Blocked" ? (
-                  <Unlock className="h-4 w-4" />
-                ) : (
-                  <Ban className="h-4 w-4" />
-                )}
-                {selectedMember.status === "Blocked" ? "Unblock" : "Block"}
-              </button>
-              <div className="my-1 border-t border-[#F1F5F9]" />
-              <button
-                type="button"
-                onClick={() => {
-                  handleDeleteMember(selectedMember);
-                  setOpenMenu(null);
-                }}
-                className="flex w-full items-center gap-2.5 px-3 py-2 text-left text-[12px] font-semibold text-[#B91C1C] transition-colors hover:bg-[#FEF2F2] hover:text-[#991B1B]"
-                role="menuitem"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete Account
-              </button>
-            </>
-          ))}
+      {openMenu && selectedMember && actions && (
+        <div ref={menuRef} style={{ top: openMenu.top, bottom: openMenu.bottom, left: openMenu.left, maxHeight: openMenu.maxHeight }}
+          onKeyDown={event => navigateRecordMenu(event, () => { setOpenMenu(null); menuTrigger.current?.focus({ preventScroll: true }); })}
+          className="ui-card fixed z-[60] w-[250px] overflow-y-auto rounded-2xl p-2 shadow-portal-dropdown" role="menu">
+          <button type="button" role="menuitem" onClick={() => choose(onViewMember)} className={menuItem}><Eye className={menuIcon} aria-hidden="true" />View Details</button>
+          {actions.ownSuper ? <button type="button" role="menuitem" className={menuItem} onClick={() => {
+            setOpenMenu(null); router.push(window.location.pathname.startsWith("/super-admin/") ? "/super-admin/profile" : "/profile");
+          }}><Pencil className={menuIcon} aria-hidden="true" />Edit</button> : <>
+            {(actions.edit || actions.protectedSuper) && <button type="button" role="menuitem" disabled={!actions.edit} title={!actions.edit ? protectedMessage : undefined} onClick={() => choose(onEditMember)} className={menuItem}><Pencil className={menuIcon} aria-hidden="true" />Edit</button>}
+            {actions.reset && <button type="button" role="menuitem" onClick={() => choose(onResetPassword)} className={menuItem}><KeyRound className={menuIcon} aria-hidden="true" />Reset Password</button>}
+            {actions.privileges && <button type="button" role="menuitem" onClick={() => choose(onManagePrivileges)} className={menuItem}><UserRoundCog className={menuIcon} aria-hidden="true" />Role &amp; Privileges</button>}
+            {(actions.block || actions.protectedSuper) && <button type="button" role="menuitem" disabled={!actions.block} title={!actions.block ? protectedMessage : undefined} onClick={() => choose(onToggleBlockStatus)} className={menuItem}>
+              {selectedMember.status === "Blocked" ? <Unlock className={menuIcon} aria-hidden="true" /> : <Ban className={menuIcon} aria-hidden="true" />}{selectedMember.status === "Blocked" ? "Unblock" : "Block"}
+            </button>}
+            {(actions.delete || actions.protectedSuper) && <button type="button" role="menuitem" disabled={!actions.delete} title={!actions.delete ? protectedMessage : undefined} onClick={() => choose(onDeleteMember)} className={`${menuItem} mt-1 bg-status-danger-surface text-status-danger hover:bg-status-danger-surface`}><Trash2 className="h-5 w-5 shrink-0" aria-hidden="true" />Delete</button>}
+            {actions.protectedSuper && <p className="px-3 pb-1 pt-2 text-xs leading-5 text-portal-muted">{protectedMessage}</p>}
+          </>}
         </div>
       )}
     </div>

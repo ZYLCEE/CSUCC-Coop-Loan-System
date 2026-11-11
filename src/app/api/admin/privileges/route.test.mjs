@@ -24,7 +24,7 @@ function setup({ callerRole = 'super_admin', targetRole = 'admin', status = 'act
     from: () => ({ insert: async row => { calls.push({ audit: row }); return { error: auditError }; } }),
   };
   const exports = {};
-  new Function('require', 'exports', 'process', code)(name => name === '@/lib/adminPrivileges' ? privilegesModule : { createClient: () => client }, exports,
+  new Function('require', 'exports', 'process', code)(name => name === "@/lib/portalActivityServer" ? {portalActivityHeaders:()=>({}),portalSessionId:()=>null} : name === '@/lib/adminPrivileges' ? privilegesModule : { createClient: () => client }, exports,
     { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://project.test', SUPABASE_SERVICE_ROLE_KEY: 'test-key' } });
   const request = (method = 'PUT', body = {}) => new Request('http://localhost/api/admin/privileges', { method,
     headers: { Authorization: 'Bearer token', 'Content-Type': 'application/json' }, ...(method === 'GET' ? {} : { body: JSON.stringify({ userId: targetId, privileges: ['documents.upload'], version, password: 'test-only', ...body }) }) });

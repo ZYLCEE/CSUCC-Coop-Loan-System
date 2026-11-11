@@ -1,7 +1,7 @@
 export const loanStatusTabs = [
   "All",
   "Pending",
-  "Under Review",
+  "Returned",
   "Approved",
   "Rejected",
 ] as const;

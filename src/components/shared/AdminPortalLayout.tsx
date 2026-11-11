@@ -7,17 +7,27 @@ import Sidebar from "@/components/shared/Sidebar";
 import Navbar from "@/components/shared/Navbar";
 import { SidebarProvider, useSidebar } from "@/contexts/SidebarContext";
 import SuperAdminLoanAlerts from "@/components/shared/SuperAdminLoanAlerts";
+import PortalFooter from "./PortalFooter";
 
-function PortalContent({ children }: { children: React.ReactNode }) {
-  const { isCollapsed } = useSidebar();
+export function PortalShell({ children, role }: { children: React.ReactNode; role: AdminRole }) {
+  const { isCollapsed, toggleSidebar } = useSidebar();
+
   return (
-    <main
-      className={`mt-[72px] min-w-0 px-4 py-6 sm:px-6 xl:px-9 transition-all duration-300 ${
-        isCollapsed ? "ml-[76px]" : "ml-64"
-      }`}
-    >
-      {children}
-    </main>
+    <div className="portal-shell admin-portal-shell" data-sidebar-collapsed={isCollapsed}>
+      <Sidebar />
+      <Navbar />
+      <main className="portal-content">{children}</main>
+      <div className="portal-content-watermark" aria-hidden="true" />
+      <PortalFooter />
+      {role === "super_admin" && <SuperAdminLoanAlerts />}
+      <button
+        type="button"
+        className="portal-sidebar-dismiss"
+        tabIndex={-1}
+        aria-label="Close sidebar"
+        onClick={toggleSidebar}
+      />
+    </div>
   );
 }
 
@@ -32,12 +42,7 @@ export default function AdminPortalLayout({
     <AdminAuthProvider requiredRole={role}>
       <SecureAdminActionProvider>
         <SidebarProvider>
-          <div className="portal-shell min-h-screen bg-[#F5F6F8]">
-            <Sidebar />
-            <Navbar />
-            <PortalContent>{children}</PortalContent>
-            {role === "super_admin" && <SuperAdminLoanAlerts />}
-          </div>
+          <PortalShell role={role}>{children}</PortalShell>
         </SidebarProvider>
       </SecureAdminActionProvider>
     </AdminAuthProvider>

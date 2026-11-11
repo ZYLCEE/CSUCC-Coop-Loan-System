@@ -1,8 +1,12 @@
 "use client";
 
-import { X } from "lucide-react";
+import { Button } from "@/components/ui/Button";
+import { DetailDialog } from "@/components/ui/DetailDialog";
+import { UserRound } from "lucide-react";
+import type { ReactNode } from "react";
 import { Member } from "./MembersData";
 import RoleBadge from "./RoleBadge";
+import {formatAccountNumber} from "@/lib/accountPresentation";
 import StatusBadge from "./StatusBadge";
 import MembershipTypeBadge from "@/components/shared/MembershipTypeBadge";
 
@@ -16,90 +20,48 @@ export default function MemberDetailsModal({ member, onClose }: MemberDetailsMod
     return null;
   }
 
-  const fields = [
-    { label: "ID Number", value: member.idNumber },
-    { label: "Full Name", value: member.fullName },
-    { label: "Email Address", value: member.email },
-    { label: "Contact Number", value: member.phone },
-    { label: "Address", value: member.address },
-    { label: "Department", value: member.department },
+  const created = new Date(member.createdAt);
+  const sections: Array<{ title: string; fields: Array<{ label: string; value: ReactNode; wide?: boolean }> }> = [
+    { title: "Personal Information", fields: [
+      { label: "ID Number", value: formatAccountNumber(member.idNumber) },
+      { label: "Full Name", value: member.fullName },
+      ...(member.role === "Member" ? [
+        { label: "Membership Type", value: <MembershipTypeBadge membershipType={member.membershipType} /> },
+        { label: "Department", value: member.department },
+      ] : []),
+    ] },
+    { title: "Contact Information", fields: [
+      { label: "Email Address", value: member.email },
+      { label: "Contact Number", value: member.phone },
+      { label: "Address", value: member.address, wide: true },
+    ] },
+    { title: "Account Information", fields: [
+      { label: "Role", value: <RoleBadge role={member.role} /> },
+      { label: "Status", value: <StatusBadge status={member.status} /> },
+      ...(member.createdAt && Number.isFinite(created.getTime()) ? [{ label: "Date Registered", value: new Intl.DateTimeFormat("en-PH", { dateStyle: "long", timeZone: "Asia/Manila" }).format(created) }] : []),
+    ] },
   ];
 
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-[#111827]/40 px-4"
-      onMouseDown={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="member-details-title"
-    >
-      <div
-        className="w-full max-w-[460px] rounded-[14px] border border-[#E5E7EB] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.24)]"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
-          <div>
-            <h2 id="member-details-title" className="text-[15px] font-bold text-[#1F2937]">
-              Account Details
-            </h2>
-            <p className="mt-0.5 text-[12px] text-[#6B7280]">
-              {member.idNumber || "ID number not recorded"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] transition-colors hover:bg-[#F1F5F9] hover:text-[#155D3B]"
-            aria-label="Close member details"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="space-y-3 px-5 py-4">
-          {fields.map((field) => (
-            <div key={field.label} className="grid grid-cols-[130px_1fr] gap-3">
-              <span className="text-[12px] font-semibold text-[#6B7280]">{field.label}</span>
-              <span className="text-[13px] font-medium text-[#1F2937]">
-                {field.value || "N/A"}
-              </span>
-            </div>
-          ))}
-          <div className="grid grid-cols-[130px_1fr] gap-3">
-            <span className="text-[12px] font-semibold text-[#6B7280]">
-              Membership Type
-            </span>
-            {member.role === "Member" ? (
-              <MembershipTypeBadge membershipType={member.membershipType} />
-            ) : (
-              <span className="text-[12px] text-[#64748B]">N/A</span>
-            )}
-          </div>
-          <div className="grid grid-cols-[130px_1fr] gap-3">
-            <span className="text-[12px] font-semibold text-[#6B7280]">Role</span>
-            <RoleBadge role={member.role} />
-          </div>
-          <div className="grid grid-cols-[130px_1fr] gap-3">
-            <span className="text-[12px] font-semibold text-[#6B7280]">Status</span>
-            <StatusBadge status={member.status} />
-          </div>
+    <DetailDialog icon={UserRound} title="Account Details" titleId="member-details-title" subtitle={formatAccountNumber(member.idNumber)}
+      closeLabel="Close member details" onClose={onClose} dismissOnBackdrop className="max-w-[900px]"
+      footer={<Button variant="primary" onClick={onClose}>Close</Button>}>
+        <div className="space-y-5">
+          {sections.map(({ title, fields }, index) => <section key={title} aria-labelledby={`member-details-section-${index}`} className="border-b border-portal-border pb-5 last:border-b-0 last:pb-0">
+            <h3 id={`member-details-section-${index}`} className="mb-3 text-sm font-bold text-coop-primary">{title}</h3>
+            <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
+              {fields.map(({ label, value, wide }) => <div key={label} className={`min-w-0 ${wide ? "col-span-full" : ""}`}>
+                <dt className="mb-1 text-caption font-semibold text-portal-muted">{label}</dt>
+                <dd className="whitespace-pre-wrap text-body font-medium text-portal-primary [overflow-wrap:anywhere]">{value || "Not recorded"}</dd>
+              </div>)}
+            </dl>
+          </section>)}
           {member.integrityIssue && (
-            <div className="rounded-md border border-[#FDE68A] bg-[#FFFBEB] px-3 py-2 text-[12px] text-[#92400E]">
+            <div className="rounded-portal-control bg-status-warning-surface px-3 py-2 text-caption text-status-warning">
               Data integrity issue: {member.integrityIssue}
             </div>
           )}
         </div>
-
-        <div className="flex justify-end border-t border-[#E5E7EB] px-5 py-4">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-[36px] rounded-[10px] bg-[#155D3B] px-4 text-[13px] font-semibold text-white transition-colors hover:bg-[#134A30]"
-          >
-            Close
-          </button>
-        </div>
-      </div>
-    </div>
+    </DetailDialog>
   );
 }

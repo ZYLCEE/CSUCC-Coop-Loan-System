@@ -1,0 +1,27 @@
+{
+  "upstreamFailures": [
+    "Available Loans retains profile, calculation and documents across routes [E]",
+    "Confirmation directs corrections to CSUCC and retains confirmed details [E]",
+    "Dashboard Apply for a Loan opens the selected product [E]",
+    "Demo amount changes update document controls and summary [E]",
+    "Demo requests are revision-bound and absent from member notifications [E]",
+    "Normal participant preview from Dashboard is read only [E]",
+    "Normal participant preview from Loans is read only [E]",
+    "Participant demo retains selections and isolates simulated consent [E]",
+    "Track Application shows retrieval errors and retries pending history [E]",
+    "Unavailable participant lookup gives a retryable error [E]"
+  ],
+  "integratedFailures": [
+    "Available Loans retains profile, calculation and documents across routes [E]",
+    "Confirmation directs corrections to CSUCC and retains confirmed details [E]",
+    "Dashboard Apply for a Loan opens the selected product [E]",
+    "Demo amount changes update document controls and summary [E]",
+    "Demo requests are revision-bound and absent from member notifications [E]",
+    "Normal participant preview from Dashboard is read only [E]",
+    "Normal participant preview from Loans is read only [E]",
+    "Participant demo retains selections and isolates simulated consent [E]",
+    "Track Application shows retrieval errors and retries pending history [E]",
+    "Unavailable participant lookup gives a retryable error [E]"
+  ],
+  "newFailures": []
+}

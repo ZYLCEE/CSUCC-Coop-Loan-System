@@ -15,14 +15,14 @@ function service(response, user = actor) {
   const client = {
     auth: { getUser: async () => ({ data: { user }, error: null }) },
     from(table) {
-      const call = { table, filters: [] }; calls.push(call);
+      const call = { table, filters: [], orders: [] }; calls.push(call);
       return {
         select(columns) { call.columns = columns; return this; },
         is(column, value) { call.filters.push([column, "is", value]); return this; },
         not(column, operator, value) { call.filters.push([column, "not", operator, value]); return this; },
         eq(column, value) { call.filters.push([column, "eq", value]); return this; },
         ilike(column, value) { call.search = [column, value]; return this; },
-        order() { return this; },
+        order(column, options) { call.orders.push([column, options]); return this; },
         range(start, end) { call.range = [start, end]; return Promise.resolve(response); },
       };
     },
@@ -54,6 +54,16 @@ test("history status/search/pagination are server queries", async () => {
 test("missing metadata is unavailable, whereas a valid empty ledger remains empty", async () => {
   await assert.rejects(service({ error: { code: "42703" }, count: null, data: null }).fetchOutgoingNotifications(actor.id, "all"), /unavailable/);
   assert.deepEqual(await service({ data: [], count: 0, error: null }).fetchOutgoingNotifications(actor.id, "all"), { items: [], total: 0 });
+});
+
+test("outgoing page size and oldest/newest sorting are applied to the complete server query", async () => {
+  const api = service({data:[],count:0,error:null});
+  await api.fetchOutgoingNotifications(actor.id, "sent", "", 30, 15, "Oldest");
+  assert.deepEqual(api.calls[0].range, [30, 44]);
+  assert.deepEqual(api.calls[0].orders, [["created_at", {ascending:true}], ["id", {ascending:true}]]);
+  await api.fetchOutgoingNotifications(actor.id, "all", "", 25, 25, "Newest");
+  assert.deepEqual(api.calls[1].range, [25, 49]);
+  assert.deepEqual(api.calls[1].orders, [["created_at", {ascending:false}], ["id", {ascending:false}]]);
 });
 
 test("incoming or unsupported-status records cannot masquerade as outgoing delivery history", async () => {

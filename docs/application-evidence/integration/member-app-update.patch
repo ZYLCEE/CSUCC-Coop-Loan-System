@@ -1,0 +1,744 @@
+diff --git a/CONSENT-INTEGRATION.md b/CONSENT-INTEGRATION.md
+new file mode 100644
+index 0000000..045fd4d
+--- /dev/null
++++ b/CONSENT-INTEGRATION.md
+@@ -0,0 +1,68 @@
++# Member app → Supabase → admin evidence integration
++
++This update targets member app commit `5aa01d87e4f32e2f4eb4d33c66c4d5377f16f053`
++from `ZYLCEE/coop-frontend-client` (the GitHub main branch inspected for this task).
++The changed app is prepared in the isolated local branch
++`codex/loan-evidence-integration`; the older member-app worktree and its uncommitted
++changes are preserved.
++
++## Update order
++
++1. The migration is already applied to your connected Supabase project. For another database, apply `supabase/migrations/20261112030000_loan_submission_agreements.sql` to the
++   cooperative Supabase database. It depends on the existing document-submission,
++   application-verification and `application_evidence_details` procedures already
++   installed for the admin app. The migration can be rerun safely.
++2. Update the member app to the GitHub revision above or a compatible descendant,
++   then apply `member-app-update.patch` from this directory in that app's root:
++
++   ```powershell
++   git apply --check C:/Users/zylcee/Desktop/COOP/coop_frontend_admin/docs/application-evidence/integration/member-app-update.patch
++   git apply C:/Users/zylcee/Desktop/COOP/coop_frontend_admin/docs/application-evidence/integration/member-app-update.patch
++   flutter pub get
++   flutter test test/loan_consent_terms_contract_test.dart test/loan_consent_submission_test.dart test/loan_document_test.dart
++   flutter build web --release
++   ```
++
++   Configure the member app's normal `.env` before building your runnable release.
++   No credentials are included in the update package. A ZIP with the changed files
++   is also provided for applying the same update after pulling the latest app.
++3. Run/redeploy the updated member app and this updated admin app. A future loan
++   submitted through the updated flow will automatically appear in View Evidence.
++
++## What is saved
++
++- Both explicit borrower confirmations, the server timestamp and Auth user.
++- The exact accepted terms text and version (not a later template).
++- The existing Witness 1/2 values from the application snapshot.
++- A borrower consent-evidence record bound to the resulting application packet.
++
++The new submission RPC calls the existing document-submission procedure and saves
++the receipt in the same transaction. It requires a current active member and a
++recent authenticated email OTP claim. False checkboxes, duplicate/invalid names,
++another member's reference, changed terms, or changed replay payloads are refused.
++Retries do not create duplicate applications, receipts or borrower consent rows.
++
++The admin view polls while idle in Requirements, CRECOM and BOD, and also refreshes
++on focus/activity notifications. It displays the saved checkboxes and accepted
++terms, co-maker approval, and borrower-supplied witness names.
++
++Witness names are labeled **Names submitted**. A name supplied by a borrower is
++not an independent witness signature or attestation; actual witness-evidence
++requirements remain enforced by the existing approved policy. No witness
++attestations or approvals are fabricated by this update.
++
++Existing loans without saved agreements stay missing: this update cannot recover
++checkbox values or names that the older app never transmitted. It does not backfill
++old loans or change their approval/release status.
++
++## Validation
++
++The rollback SQL covers atomic submission, checkbox values, stored terms and
++witness names, replay safety, changed-payload rejection and OTP enforcement, with
++all synthetic rows rolled back. Flutter tests exercise confirmation validation and
++the actual RPC payload on retry; document tests retain existing validation.
++The admin browser test checks the saved checked/disabled controls and exact terms.
++
++Validation completed: 11 focused Flutter tests, 7 API/model tests, the admin browser workflow suite, TypeScript/ESLint, the admin production build and the member web release build passed. The broad upstream loan-flow suite has 10 pre-existing UI test failures; comparison with the unmodified GitHub source showed the same 10 failures and no additional failures from this integration. See flow-test-comparison.json.
++
++The patch and ZIP are local deliverables; the GitHub main branch has not been changed. Apply the included source update after pulling the app, then build/run that updated app. The source worktree uses a placeholder .env for compilation; configure your normal app environment for a runnable release.
+diff --git a/lib/co_maker_invitation_screen.dart b/lib/co_maker_invitation_screen.dart
+index 47fe3c4..5f96680 100644
+--- a/lib/co_maker_invitation_screen.dart
++++ b/lib/co_maker_invitation_screen.dart
+@@ -10,6 +10,7 @@ import 'application_service.dart';
+ import 'loan_application_flow.dart';
+ import 'loan_participants_screen.dart';
+ import 'models/loan_agreement_snapshot.dart';
++import 'models/loan_consent_submission.dart';
+ import 'responsive.dart';
+ import 'services/co_maker_invitation_service.dart';
+ import 'services/supabase_service.dart';
+@@ -51,6 +52,8 @@ class _BorrowerCoMakerInvitationScreenState
+     extends State<BorrowerCoMakerInvitationScreen> {
+   bool _busy = false;
+   bool _acknowledged = false;
++  bool _termsAccepted = false;
++  bool _informationCertified = false;
+   String? _error;
+   String? _requestId;
+   String? _status;
+@@ -141,12 +144,26 @@ class _BorrowerCoMakerInvitationScreenState
+   }
+ 
+   Future<void> _continueToSubmission() async {
+-    if (_busy || !widget.flow.canUseLiveSubmission || _status != 'accepted') {
++    if (_busy ||
++        !widget.flow.canUseLiveSubmission ||
++        _status != 'accepted' ||
++        !_termsAccepted ||
++        !_informationCertified) {
+       return;
+     }
+     await widget.flow.push(
+       context,
+-      (_) => EmailOtpVerificationScreen(flow: widget.flow),
++      (_) => EmailOtpVerificationScreen(
++        flow: widget.flow,
++        consent: LoanConsentSubmission(
++          termsAccepted: _termsAccepted,
++          informationCertified: _informationCertified,
++          witnessNames: [
++            widget.snapshot.witnessOne,
++            widget.snapshot.witnessTwo,
++          ],
++        ),
++      ),
+     );
+   }
+ 
+@@ -244,13 +261,36 @@ class _BorrowerCoMakerInvitationScreenState
+                   'Switch this flow to live mode before sending invitations or submitting applications.',
+                   style: AppTheme.captionRegular,
+                 )
+-              else if (_status == 'accepted')
++              else if (_status == 'accepted') ...[
++                CheckboxListTile(
++                  value: _termsAccepted,
++                  onChanged: _busy
++                      ? null
++                      : (value) =>
++                            setState(() => _termsAccepted = value ?? false),
++                  title: const Text(
++                    'I have read, understood, and agree to the Terms and Conditions.',
++                  ),
++                ),
++                CheckboxListTile(
++                  value: _informationCertified,
++                  onChanged: _busy
++                      ? null
++                      : (value) => setState(
++                          () => _informationCertified = value ?? false,
++                        ),
++                  title: const Text(
++                    'I certify that all information provided in this loan application is true and correct.',
++                  ),
++                ),
+                 ElevatedButton(
+-                  onPressed: _busy ? null : _continueToSubmission,
++                  onPressed: _busy || !_termsAccepted || !_informationCertified
++                      ? null
++                      : _continueToSubmission,
+                   style: _loanActionButtonStyle(enabled: !_busy),
+                   child: const Text('Continue to Loan Submission'),
+-                )
+-              else if (_status == 'rejected')
++                ),
++              ] else if (_status == 'rejected')
+                 ElevatedButton(
+                   onPressed: _busy ? null : _chooseAnotherCoMaker,
+                   style: _loanActionButtonStyle(enabled: !_busy),
+diff --git a/lib/email_otp_verification_screen.dart b/lib/email_otp_verification_screen.dart
+index 301f43c..f514015 100644
+--- a/lib/email_otp_verification_screen.dart
++++ b/lib/email_otp_verification_screen.dart
+@@ -1,4 +1,5 @@
+ import 'loan_application_flow.dart';
++import 'models/loan_consent_submission.dart';
+ import 'widgets/loan_progress_indicator.dart';
+ import 'package:flutter/material.dart';
+ import 'package:flutter/services.dart';
+@@ -27,7 +28,12 @@ String maskEmailAddress(String email) {
+ class EmailOtpVerificationScreen extends StatefulWidget {
+   final LoanApplicationFlow flow;
+ 
+-  const EmailOtpVerificationScreen({super.key, required this.flow});
++  final LoanConsentSubmission? consent;
++  const EmailOtpVerificationScreen({
++    super.key,
++    required this.flow,
++    this.consent,
++  });
+ 
+   @override
+   State<EmailOtpVerificationScreen> createState() =>
+@@ -236,6 +242,12 @@ class _EmailOtpVerificationScreenState
+     final otp = _getOtpValue();
+ 
+     try {
++      final consent = widget.consent;
++      if (consent == null)
++        throw StateError(
++          'Return to the agreement review and confirm both checkboxes.',
++        );
++      consent.validate();
+       if (!_isEmailVerified) {
+         final email = _verifiedEmail ?? await _loadVerifiedRegisteredEmail();
+         if (email == null)
+@@ -280,6 +292,7 @@ class _EmailOtpVerificationScreenState
+         amount: draft.amount,
+         documents: draft.documents.values.toList(growable: false),
+         tenureMonths: draft.tenure,
++        consent: consent,
+         participantsDemo: widget.flow.participantsDemo,
+         onProgress: (status) {
+           if (mounted) setState(() => _submissionStatus = status);
+diff --git a/lib/models/loan_consent_submission.dart b/lib/models/loan_consent_submission.dart
+new file mode 100644
+index 0000000..7d11f56
+--- /dev/null
++++ b/lib/models/loan_consent_submission.dart
+@@ -0,0 +1,40 @@
++/// Values explicitly confirmed on the review screen, never inferred from submission.
++class LoanConsentSubmission {
++  const LoanConsentSubmission({
++    required this.termsAccepted,
++    required this.informationCertified,
++    this.witnessNames = const [],
++  });
++
++  static const termsVersion = 'csucc-loan-terms-2026-11-12-v1';
++  final bool termsAccepted;
++  final bool informationCertified;
++  final List<String> witnessNames;
++
++  List<String> get normalizedWitnessNames => witnessNames
++      .map((name) => name.trim())
++      .where((name) => name.isNotEmpty)
++      .toList(growable: false);
++
++  void validate() {
++    if (!termsAccepted || !informationCertified) {
++      throw StateError(
++        'Accept the Terms and Conditions and certify your application information.',
++      );
++    }
++    final names = normalizedWitnessNames;
++    if (names.length > 2 ||
++        names.any(
++          (name) =>
++              name.length > 160 || RegExp(r'[\x00-\x1f\x7f]').hasMatch(name),
++        )) {
++      throw StateError(
++        'Enter up to two valid witness names, each at most 160 characters.',
++      );
++    }
++    if (names.map((name) => name.toLowerCase()).toSet().length !=
++        names.length) {
++      throw StateError('Enter different people in the witness fields.');
++    }
++  }
++}
+diff --git a/lib/review_terms_screen.dart b/lib/review_terms_screen.dart
+index a7d7c86..e08f1a8 100644
+--- a/lib/review_terms_screen.dart
++++ b/lib/review_terms_screen.dart
+@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
+ import 'app_theme.dart';
+ import 'email_otp_verification_screen.dart';
+ import 'models/loan_agreement_snapshot.dart';
++import 'models/loan_consent_submission.dart';
+ import 'demo_loan_consent_screen.dart';
+ import 'co_maker_invitation_screen.dart';
+ 
+@@ -102,7 +103,17 @@ class _ReviewTermsScreenState extends State<ReviewTermsScreen> {
+                 onPressed: _isValidated
+                     ? () => widget.flow.push(
+                         context,
+-                        (_) => EmailOtpVerificationScreen(flow: widget.flow),
++                        (_) => EmailOtpVerificationScreen(
++                          flow: widget.flow,
++                          consent: LoanConsentSubmission(
++                            termsAccepted: _acceptedTerms,
++                            informationCertified: _certifiedInformation,
++                            witnessNames: [
++                              widget.snapshot.witnessOne,
++                              widget.snapshot.witnessTwo,
++                            ],
++                          ),
++                        ),
+                       )
+                     : null,
+               ),
+diff --git a/lib/services/database_service.dart b/lib/services/database_service.dart
+index 2f8901a..d9fa603 100644
+--- a/lib/services/database_service.dart
++++ b/lib/services/database_service.dart
+@@ -1,6 +1,7 @@
+ import 'package:supabase_flutter/supabase_flutter.dart';
+ import '../loan_application_mode.dart';
+ import '../models/loan_document.dart';
++import '../models/loan_consent_submission.dart';
+ import '../models/loan_policy.dart';
+ import 'loan_document_upload_service.dart';
+ 
+@@ -126,6 +127,7 @@ class DatabaseService {
+     required double amount,
+     required List<SelectedLoanDocument> documents,
+     required int tenureMonths,
++    LoanConsentSubmission? consent,
+     void Function(String)? onProgress,
+     bool participantsDemo = false,
+   }) async {
+@@ -136,6 +138,7 @@ class DatabaseService {
+       amount: amount,
+       documents: documents,
+       tenureMonths: tenureMonths,
++      consent: consent,
+       onProgress: onProgress,
+       participantsDemo: participantsDemo,
+     );
+diff --git a/lib/services/loan_document_upload_service.dart b/lib/services/loan_document_upload_service.dart
+index 193c2e2..1bf8d5f 100644
+--- a/lib/services/loan_document_upload_service.dart
++++ b/lib/services/loan_document_upload_service.dart
+@@ -2,6 +2,7 @@ import 'dart:math';
+ import 'package:supabase_flutter/supabase_flutter.dart';
+ import '../loan_application_mode.dart';
+ import '../models/loan_document.dart';
++import '../models/loan_consent_submission.dart';
+ 
+ class LoanDocumentUploadService {
+   LoanDocumentUploadService({SupabaseClient? client})
+@@ -15,14 +16,37 @@ class LoanDocumentUploadService {
+     required double amount,
+     required List<SelectedLoanDocument> documents,
+     required int tenureMonths,
++    LoanConsentSubmission? consent,
+     void Function(String)? onProgress,
+     bool participantsDemo = false,
+   }) async {
+     requireLiveLoanOperations(participantsDemo: participantsDemo);
++    if (consent == null)
++      throw StateError(
++        'Review and accept the borrower agreement before submitting.',
++      );
++    consent.validate();
+     validateLoanDocuments(documents, amount);
+     final user = _client.auth.currentUser;
+     if (user == null) throw StateError('Sign in before submitting documents.');
+     final type = loanType.replaceFirst(RegExp(r'\s+Loan$'), '');
++    Future<void> commit(List<Map<String, dynamic>> metadata) async {
++      await _client.rpc(
++        'submit_loan_with_agreements',
++        params: {
++          'p_application_id': applicationId,
++          'p_loan_type': type,
++          'p_amount': amount,
++          'p_documents': metadata,
++          'p_tenure_months': tenureMonths,
++          'p_terms_accepted': consent.termsAccepted,
++          'p_information_certified': consent.informationCertified,
++          'p_terms_version': LoanConsentSubmission.termsVersion,
++          'p_witness_names': consent.normalizedWitnessNames,
++        },
++      );
++    }
++
+     final policy = await _client
+         .from('loan_policy_settings')
+         .select('collateral_required_above')
+@@ -52,7 +76,7 @@ class LoanDocumentUploadService {
+     if (existing != null) {
+       final saved = await _client
+           .from('loan_documents')
+-          .select('kind')
++          .select('kind,storage_path,original_name,content_type,size_bytes')
+           .eq('loan_application_id', existing['id']);
+       final kinds = saved.map((row) => row['kind']).toSet();
+       if (existing['member_id'] == member['id'] &&
+@@ -66,7 +90,20 @@ class LoanDocumentUploadService {
+           kinds.contains('payslip') &&
+           kinds.contains('validId') &&
+           (amount <= collateralRequiredAbove || kinds.contains('collateral'))) {
+-        return; // A previous submission committed but its response was lost.
++        await commit(
++          saved
++              .map(
++                (row) => <String, dynamic>{
++                  'kind': row['kind'],
++                  'path': row['storage_path'],
++                  'name': row['original_name'],
++                  'mimeType': row['content_type'],
++                  'size': row['size_bytes'],
++                },
++              )
++              .toList(growable: false),
++        );
++        return; // The server checks and replays the saved agreement too.
+       }
+       throw StateError(
+         'This reference has already been used. Please start a new application.',
+@@ -107,16 +144,7 @@ class LoanDocumentUploadService {
+       if (_client.auth.currentUser?.id != user.id)
+         throw StateError('Your session changed. Please sign in again.');
+       onProgress?.call('Saving application and documents...');
+-      await _client.rpc(
+-        'submit_loan_with_documents',
+-        params: {
+-          'p_application_id': applicationId,
+-          'p_loan_type': type,
+-          'p_amount': amount,
+-          'p_documents': metadata,
+-          'p_tenure_months': tenureMonths,
+-        },
+-      );
++      await commit(metadata);
+     } catch (failure) {
+       // Storage RLS refuses removal of files referenced by committed documents.
+       // This also protects successful submissions whose response was lost.
+@@ -128,7 +156,8 @@ class LoanDocumentUploadService {
+         }
+       }
+       if (failure is StateError) rethrow;
+-      if (failure is PostgrestException && failure.code == 'P0001')
++      if (failure is PostgrestException &&
++          ['P0001', '40001', '42501'].contains(failure.code))
+         throw StateError(failure.message);
+       if (failure is PostgrestException && failure.code == '23505')
+         throw StateError(failure.message);
+diff --git a/supabase/migrations/20261112030000_loan_submission_agreements.sql b/supabase/migrations/20261112030000_loan_submission_agreements.sql
+new file mode 100644
+index 0000000..5105177
+--- /dev/null
++++ b/supabase/migrations/20261112030000_loan_submission_agreements.sql
+@@ -0,0 +1,115 @@
++-- Atomic borrower agreements and borrower-supplied witness names for new applications.
++BEGIN;
++CREATE TABLE IF NOT EXISTS public.loan_submission_agreements(
++ id uuid PRIMARY KEY DEFAULT gen_random_uuid(), application_id uuid NOT NULL UNIQUE REFERENCES public.loan_applications(id),
++ borrower_user_id uuid NOT NULL REFERENCES auth.users(id), packet_hash text NOT NULL,
++ terms_accepted boolean NOT NULL CHECK(terms_accepted), information_certified boolean NOT NULL CHECK(information_certified),
++ terms_version text NOT NULL, terms_text text NOT NULL, witness_names jsonb NOT NULL CHECK(jsonb_typeof(witness_names)='array'),
++ accepted_at timestamptz NOT NULL DEFAULT now()
++);
++ALTER TABLE public.loan_submission_agreements ENABLE ROW LEVEL SECURITY;
++REVOKE ALL ON public.loan_submission_agreements FROM PUBLIC,anon,authenticated;
++GRANT SELECT ON public.loan_submission_agreements TO authenticated;
++GRANT ALL ON public.loan_submission_agreements TO service_role;
++DROP POLICY IF EXISTS read_own_or_staff_agreements ON public.loan_submission_agreements;
++CREATE POLICY read_own_or_staff_agreements ON public.loan_submission_agreements FOR SELECT TO authenticated
++ USING(borrower_user_id=auth.uid() OR public.document_staff_access());
++
++CREATE OR REPLACE FUNCTION public.submit_loan_with_agreements(p_application_id text,p_loan_type text,p_amount numeric,p_documents jsonb,p_tenure_months integer,
++ p_terms_accepted boolean,p_information_certified boolean,p_terms_version text,p_witness_names jsonb)
++RETURNS uuid LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $function$
++DECLARE app_id uuid; packet text; receipt public.loan_submission_agreements%ROWTYPE; names jsonb;
++BEGIN
++ IF auth.uid() IS NULL OR NOT public.can_submit_loan_documents() THEN RAISE EXCEPTION 'An active member account is required.' USING ERRCODE='42501';END IF;
++ IF p_terms_accepted IS DISTINCT FROM true OR p_information_certified IS DISTINCT FROM true THEN RAISE EXCEPTION 'Accept the Terms and Conditions and certify your application information.';END IF;
++ IF p_terms_version IS DISTINCT FROM 'csucc-loan-terms-2026-11-12-v1' THEN RAISE EXCEPTION 'The terms version changed. Update the app and review the agreement again.';END IF;
++ IF NOT EXISTS(SELECT 1 FROM jsonb_array_elements(coalesce(auth.jwt()->'amr','[]')) amr
++  WHERE amr->>'method'='otp' AND (amr->>'timestamp')::numeric BETWEEN extract(epoch FROM now()-interval '30 minutes') AND extract(epoch FROM now()+interval '1 minute'))
++ THEN RAISE EXCEPTION 'Verify the borrower email with a fresh OTP before submitting.' USING ERRCODE='42501';END IF;
++ IF p_witness_names IS NULL OR jsonb_typeof(p_witness_names) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'Enter valid witness names.';END IF;
++ IF jsonb_array_length(p_witness_names)>2 OR EXISTS(SELECT 1 FROM jsonb_array_elements(p_witness_names) n WHERE jsonb_typeof(n)<>'string' OR length(btrim(n#>>'{}')) NOT BETWEEN 1 AND 160 OR (n#>>'{}') ~ '[[:cntrl:]]')
++ THEN RAISE EXCEPTION 'Enter up to two witness names, each at most 160 characters.';END IF;
++ SELECT coalesce(jsonb_agg(btrim(n#>>'{}') ORDER BY position),'[]') INTO names FROM jsonb_array_elements(p_witness_names) WITH ORDINALITY x(n,position);
++ IF (SELECT count(DISTINCT lower(n)) FROM jsonb_array_elements_text(names)n)<>jsonb_array_length(names) THEN RAISE EXCEPTION 'Enter different people in the witness fields.';END IF;
++ PERFORM pg_advisory_xact_lock(hashtextextended(p_application_id,0));
++ SELECT a.id INTO app_id FROM public.loan_applications a WHERE a.application_id=p_application_id;
++ IF app_id IS NOT NULL AND NOT EXISTS(SELECT 1 FROM public.loan_submission_agreements r WHERE r.application_id=app_id AND r.borrower_user_id=auth.uid())
++ THEN RAISE EXCEPTION 'This older application has no saved agreement. Start a new application reference after reviewing the terms.';END IF;
++ app_id:=public.submit_loan_with_documents(p_application_id,p_loan_type,p_amount,p_documents,p_tenure_months);
++ packet:=public.private_application_verification_state(app_id)->>'packetHash';
++ SELECT * INTO receipt FROM public.loan_submission_agreements WHERE application_id=app_id;
++ IF FOUND THEN
++  IF receipt.borrower_user_id IS DISTINCT FROM auth.uid() OR receipt.witness_names IS DISTINCT FROM names OR receipt.terms_version IS DISTINCT FROM p_terms_version OR receipt.packet_hash IS DISTINCT FROM packet
++  THEN RAISE EXCEPTION 'This saved application agreement changed. Start a new application reference.' USING ERRCODE='40001';END IF;
++  RETURN app_id;
++ END IF;
++ INSERT INTO public.loan_submission_agreements(application_id,borrower_user_id,packet_hash,terms_accepted,information_certified,terms_version,terms_text,witness_names)
++ VALUES(app_id,auth.uid(),packet,true,true,p_terms_version,$terms$1. The loan shall be payable in __________ mo/s. with monthly amortization of PhP __________ thru salary deduction/ATM retention or issuance of PDC to commence on the payroll date immediately succeeding the date of loan granted.
++
++2. The borrower hereby agrees to pay the 2% interest per month. The borrower also agrees that the above interest rate of the loan as well as all fees and charges under this agreement/note maybe increase by the coop anytime during the term of the loan if CSUCC ER MPC so requires. The borrower shall be notified of the increase which shall take effect on the next scheduled amortization.
++
++3. The borrower that in case of his transfer of assignment where he/she no longer receives his salary from his former station, the loan shall become due and demandable.
++
++4. In the event the borrower is TERMINATED/SEPARATED from CSU Cabadbaran City (CSUCC), (a) the borrower's outstanding loan shall become Due and Demandable; (b) the borrower hereby agrees that all his salaries, bonuses, separation/gratuity pay, retirement benefits, and all other benefits due to him from his/employer and from any other sources (SSS, GSIS, etc.) shall be withheld by his/her employer and remitted to the CSUCC ER MPC to settle the borrower's outstanding loan; (c) if the outstanding loan plus all interest thereon have been fully settled by the borrower (d) if the amount collected from the borrower is insufficient to cover the borrower's outstanding obligation with the coop, the Co-Maker agrees to settle the balance of the loan and authorizes the Head of Office/Disbursing Officer to withhold his/her Payroll until the loan balance has been settled:
++
++5. In the event the Co-maker is terminated/separated from service with CSU Cabadbaran City (CSUCC), the borrower shall submit to the Coop a qualified and acceptable replacement of the Co-maker for the loan as determined by the Coop within ten (10) days from termination/separation of the co-maker. Failure to do so shall constitute an event of Default hereunder.
++
++6. The Borrower and Co-maker shall be jointly and severally liable to the CSUCC ER MPC for the full payment and complete performance of such obligation from any one of them;
++
++7. The borrower and co-maker hereby assign in favor of CSUCC ER MPC their salaries, allowances, bonuses, retirement benefits, separation/gratuity pay, monetary value of their accumulated leave credits/service credits and other monies/benefits (collectively referred to as receivable) due to them from their employer, SSS, GSIS or from whatever source. The liability of the borrower and co-maker under this assignment shall extend to all renewals and/or extensions of time of payment of the loan plus all interest thereon. To affect above assignment, the borrower and co-maker irrevocably appoint and constitute CSUCC ER MPC as their True and Lawful Attorney-In-Fact with full power and authority to apply or use the proceeds of the Receivables in payment of the loan plus interest thereon, to collect the amounts due hereunder and endorsed any checks or other instruments and to file any claims on institute any proceedings which are necessary to protect the bank's right under the Assignment.
++
++8. The borrower agrees and authorizes CSUCC ER MPC to act as his agent to, (a) periodically deduct from his/her salary and other remuneration the amortization of the loan and (b) remit the same to CSUCC ER MPC not later than the 10th banking after each payroll date without demand, protest or notice of any kind;
++
++9. The borrower agrees that any legal action suit or proceedings arising out or relating to this agreement/note, or other documentation contemplated hereby maybe instituted by the CSUCC ER MPC and its option in the appropriate Courts of Agusan del Norte or in any other jurisdiction where the assets or properties of the borrowers, maybe found. The borrower hereby irrevocably submits himself to the jurisdiction of such courts;
++
++10. The borrower shall pay the CSUCC ER MPC reasonable attorney's fees which shall be in the amount equal to twenty (20%) percent of the total amount due, regardless of whether or not CSUCC ER MPC institutes suit for purposes of collection and any and all cost of litigation the event CSUCC ER MPC is constrained to institute a court suit to enforce collection of amounts due hereunder or for breach of any terms of this agreement/note;
++
++11. The borrower agrees to pay a service fee of One percent (1%) of the loaned amount.
++
++12. Violation from the Terms and Conditions shall make the Loan DUE and DEMANDABLE.$terms$,names) RETURNING * INTO receipt;
++ INSERT INTO public.application_consent_evidence(id,application_id,kind,subject_reference,subject_user_id,method,evidence_reference,packet_hash,occurred_at)
++ SELECT receipt.id,app_id,'borrower',m.member_id,auth.uid(),'otp','Borrower agreement receipt: '||receipt.id,packet,receipt.accepted_at FROM public.members m WHERE m.user_id=auth.uid();
++ RETURN app_id;
++END;
++$function$;
++REVOKE ALL ON FUNCTION public.submit_loan_with_agreements(text,text,numeric,jsonb,integer,boolean,boolean,text,jsonb) FROM PUBLIC,anon;
++GRANT EXECUTE ON FUNCTION public.submit_loan_with_agreements(text,text,numeric,jsonb,integer,boolean,boolean,text,jsonb) TO authenticated;
++CREATE OR REPLACE FUNCTION public.application_evidence_details(p_application_id text,p_packet_hash text)
++RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path='' AS $$
++DECLARE state jsonb; app public.loan_applications%ROWTYPE; records jsonb;
++BEGIN
++ IF NOT public.document_staff_access() THEN RAISE EXCEPTION 'Active administrator access is required.' USING ERRCODE='42501';END IF;
++ state:=public.get_application_verification(p_application_id);
++ IF p_packet_hash IS DISTINCT FROM state->>'packetHash' THEN RAISE EXCEPTION 'The application changed. Refresh before viewing its evidence.' USING ERRCODE='40001';END IF;
++ SELECT * INTO STRICT app FROM public.loan_applications WHERE id=(state->>'applicationUuid')::uuid;
++ SELECT coalesce(jsonb_agg(record ORDER BY occurred DESC),'[]') INTO records FROM (
++  SELECT e.occurred_at AS occurred,jsonb_build_object('id',e.id,'kind',e.kind,
++   'subject_reference',e.subject_reference,'subject_name',coalesce(nullif(concat_ws(' ',person.first_name,person.last_name),''),e.subject_reference),
++   'method',e.method,'occurred_at',e.occurred_at,'evidence_reference',e.evidence_reference,'status','recorded','source','consent_evidence','terms_accepted',agreement.terms_accepted,'information_certified',agreement.information_certified,'terms_version',agreement.terms_version,'terms_text',agreement.terms_text) AS record
++  FROM public.application_consent_evidence e
++  LEFT JOIN public.loan_submission_agreements agreement ON agreement.id=e.id
++  LEFT JOIN LATERAL (SELECT m.first_name,m.last_name FROM public.members m WHERE
++   (e.subject_user_id IS NOT NULL AND m.user_id=e.subject_user_id) OR m.member_id=e.subject_reference OR m.id::text=e.subject_reference OR m.user_id::text=e.subject_reference ORDER BY m.id LIMIT 1)person ON true
++  WHERE e.application_id=app.id AND e.packet_hash=p_packet_hash AND e.invalidated_at IS NULL
++   AND e.occurred_at<=now() AND (e.expires_at IS NULL OR e.expires_at>now())
++  UNION ALL
++  SELECT r.accepted_at,jsonb_build_object('id',r.id,'kind','co_maker','subject_reference',coalesce(m.member_id,r.co_maker_name),
++   'subject_name',r.co_maker_name,'method','member_approval','occurred_at',r.accepted_at,'evidence_reference',r.id,
++   'status','approved','source','co_maker_request','relationship',r.relationship,'borrower_name',r.borrower_name,
++   'amount',r.amount,'tenure_months',r.tenure_months,'loan_type',r.loan_type)
++  FROM public.co_maker_requests r LEFT JOIN public.members m ON m.id=r.co_maker_member_id
++  WHERE r.id=app.co_maker_request_id AND r.application_id=app.application_id AND r.co_maker_member_id=app.co_maker_member_id
++   AND r.borrower_member_id=app.member_id AND r.status='accepted' AND r.accepted_at IS NOT NULL AND r.accepted_at<=now()
++  UNION ALL
++  SELECT receipt.accepted_at,jsonb_build_object('id',receipt.id::text||':witness:'||w.position,'kind','witness','subject_reference',w.name,'subject_name',w.name,
++   'method','borrower_declaration','occurred_at',receipt.accepted_at,'evidence_reference','Loan application witness names','status','named','source','borrower_witness_names')
++  FROM public.loan_submission_agreements receipt CROSS JOIN LATERAL jsonb_array_elements_text(receipt.witness_names) WITH ORDINALITY w(name,position)
++  WHERE receipt.application_id=app.id AND receipt.packet_hash=p_packet_hash
++ ) proof;
++ RETURN jsonb_build_object('records',records);
++END;
++$$;
++REVOKE ALL ON FUNCTION public.application_evidence_details(text,text) FROM PUBLIC,anon;
++GRANT EXECUTE ON FUNCTION public.application_evidence_details(text,text) TO authenticated,service_role;
++NOTIFY pgrst,'reload schema';
++COMMIT;
+diff --git a/test/loan_consent_submission_test.dart b/test/loan_consent_submission_test.dart
+new file mode 100644
+index 0000000..56866c7
+--- /dev/null
++++ b/test/loan_consent_submission_test.dart
+@@ -0,0 +1,158 @@
++import 'dart:convert';
++import 'dart:io';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:supabase_flutter/supabase_flutter.dart';
++import 'package:coop_frontend/models/loan_consent_submission.dart';
++import 'package:coop_frontend/models/loan_document.dart';
++import 'package:coop_frontend/services/loan_document_upload_service.dart';
++import 'dart:typed_data';
++
++void main() {
++  test(
++    'both confirmations are required and witness names are normalized and distinct',
++    () {
++      for (final consent in [
++        const LoanConsentSubmission(
++          termsAccepted: false,
++          informationCertified: true,
++        ),
++        const LoanConsentSubmission(
++          termsAccepted: true,
++          informationCertified: false,
++        ),
++        const LoanConsentSubmission(
++          termsAccepted: true,
++          informationCertified: true,
++          witnessNames: ['Same', ' same '],
++        ),
++      ]) {
++        expect(consent.validate, throwsStateError);
++      }
++      const consent = LoanConsentSubmission(
++        termsAccepted: true,
++        informationCertified: true,
++        witnessNames: [' Witness One ', '', 'Witness Two'],
++      );
++      consent.validate();
++      expect(consent.normalizedWitnessNames, ['Witness One', 'Witness Two']);
++    },
++  );
++
++  test(
++    'a retry sends the saved document manifest and explicit consent to the atomic RPC',
++    () async {
++      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
++      const owner = '10000000-0000-0000-0000-000000000003';
++      final calls = <Map<String, dynamic>>[];
++      String part(Object data) =>
++          base64Url.encode(utf8.encode(jsonEncode(data))).replaceAll('=', '');
++      final token =
++          '${part({'alg': 'HS256'})}.${part({'sub': owner, 'role': 'authenticated', 'exp': DateTime.now().millisecondsSinceEpoch ~/ 1000 + 3600})}.synthetic';
++      server.listen((request) async {
++        final body = await utf8.decoder.bind(request).join();
++        request.response.headers.contentType = ContentType.json;
++        Object data = [];
++        if (request.uri.path.endsWith('/token')) {
++          data = {
++            'access_token': token,
++            'refresh_token': 'synthetic-refresh',
++            'token_type': 'bearer',
++            'expires_in': 3600,
++            'user': {
++              'id': owner,
++              'email': 'synthetic@example.invalid',
++              'app_metadata': {'role': 'member'},
++              'user_metadata': {},
++              'created_at': '2026-01-01T00:00:00Z',
++            },
++          };
++        } else if (request.uri.path.endsWith('/loan_policy_settings')) {
++          data = {'collateral_required_above': 200000};
++        } else if (request.uri.path.endsWith('/members')) {
++          data = {
++            'id': 'member-fixture',
++            'status': 'active',
++            'must_change_password': false,
++          };
++        } else if (request.uri.path.endsWith('/loan_applications')) {
++          data = {
++            'id': 'app-fixture',
++            'member_id': 'member-fixture',
++            'loan_type': 'Regular',
++            'amount': 1000,
++            'tenure_months': 12,
++          };
++        } else if (request.uri.path.endsWith('/loan_documents')) {
++          data = [
++            for (final kind in ['validId', 'payslip'])
++              {
++                'kind': kind,
++                'storage_path': '$owner/LA-2026-123456/$kind.pdf',
++                'original_name': '$kind.pdf',
++                'content_type': 'application/pdf',
++                'size_bytes': 10,
++              },
++          ];
++        } else if (request.uri.path.endsWith(
++          '/rpc/submit_loan_with_agreements',
++        )) {
++          calls.add(Map<String, dynamic>.from(jsonDecode(body) as Map));
++          data = 'app-fixture';
++        } else {
++          request.response.statusCode = 500;
++          data = {'message': 'Unexpected endpoint'};
++        }
++        request.response.write(jsonEncode(data));
++        await request.response.close();
++      });
++      final client = SupabaseClient(
++        'http://${server.address.address}:${server.port}',
++        'synthetic-key',
++      );
++      try {
++        await client.auth.signInWithPassword(
++          email: 'synthetic@example.invalid',
++          password: 'Synthetic1!',
++        );
++        final documents = <SelectedLoanDocument>[];
++        // The selected document model is tested separately; use actual valid PDF fixtures here.
++        for (final kind in [
++          LoanDocumentKind.validId,
++          LoanDocumentKind.payslip,
++        ]) {
++          documents.add(
++            SelectedLoanDocument.fromBytes(
++              kind: kind,
++              name: '${kind.name}.pdf',
++              bytes: Uint8List.fromList(utf8.encode('%PDF-1.4 fixture')),
++            ),
++          );
++        }
++        await LoanDocumentUploadService(client: client).submit(
++          applicationId: 'LA-2026-123456',
++          loanType: 'Regular',
++          amount: 1000,
++          documents: documents,
++          tenureMonths: 12,
++          consent: const LoanConsentSubmission(
++            termsAccepted: true,
++            informationCertified: true,
++            witnessNames: [' Witness One ', 'Witness Two'],
++          ),
++        );
++        expect(calls, hasLength(1));
++        expect(calls.single['p_terms_accepted'], true);
++        expect(calls.single['p_information_certified'], true);
++        expect(calls.single['p_witness_names'], ['Witness One', 'Witness Two']);
++        expect(
++          calls.single['p_terms_version'],
++          LoanConsentSubmission.termsVersion,
++        );
++        expect(calls.single['p_documents'], hasLength(2));
++      } finally {
++        await client.dispose();
++        await server.close(force: true);
++      }
++    },
++  );
++}
+diff --git a/test/loan_consent_terms_contract_test.dart b/test/loan_consent_terms_contract_test.dart
+new file mode 100644
+index 0000000..549dba4
+--- /dev/null
++++ b/test/loan_consent_terms_contract_test.dart
+@@ -0,0 +1,29 @@
++import 'dart:io';
++import 'package:flutter_test/flutter_test.dart';
++import 'package:coop_frontend/models/loan_consent_submission.dart';
++
++void main() {
++  test('the saved terms match the member review text and version', () {
++    final sql = File(
++      'supabase/migrations/20261112030000_loan_submission_agreements.sql',
++    ).readAsStringSync();
++    final source = File('lib/review_terms_screen.dart').readAsStringSync();
++    final termsCard = source.substring(source.indexOf('class TermsCard'));
++    final paragraphs = RegExp(r"'((?:\\'|[^'\n])*)',")
++        .allMatches(termsCard)
++        .map((match) => match.group(1)!)
++        .where((text) => RegExp(r'^\d+\.').hasMatch(text))
++        .map(
++          (text) =>
++              text.replaceAll(r"\'", "'").replaceAll(RegExp(r'</?b>'), ''),
++        )
++        .toList();
++    expect(paragraphs, hasLength(12));
++    final savedTerms = RegExp(
++      r'\$terms\$(.*?)\$terms\$',
++      dotAll: true,
++    ).firstMatch(sql)!.group(1);
++    expect(savedTerms, paragraphs.join('\n\n'));
++    expect(sql, contains(LoanConsentSubmission.termsVersion));
++  });
++}

@@ -3,13 +3,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fetchAdminNotifications, fetchUnreadNotificationCount, markAdminNotificationRead,
-  markAllAdminNotificationsRead, notificationPageSize,
+  markAllAdminNotificationsRead, notificationPageSize, adminNotificationReceivedEvent,
   type AdminNotification, type NotificationFilter, type NotificationQuery, recentNotificationQuery,
+  watchAdminNotifications,
 } from "@/lib/adminNotifications";
 
 const errorMessage = (error: unknown) => error instanceof Error ? error.message : "Notifications are unavailable. Please retry.";
 
-export function useNotificationInbox(userId: string) {
+export function useNotificationInbox(userId: string, open: boolean) {
+  useEffect(()=>watchAdminNotifications(userId,()=>window.dispatchEvent(new Event(adminNotificationReceivedEvent))),[userId]);
   const [items, setItems] = useState<AdminNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [query, setQuery] = useState<NotificationQuery>(recentNotificationQuery);
@@ -74,6 +76,29 @@ export function useNotificationInbox(userId: string) {
       if (mounted.current && version === revision.current) setLoading(false);
     }
   }, [userId]);
+
+  useEffect(() => {
+    const update = () => {
+      if (busyRef.current) return;
+      if (open) {
+        void refresh(queryRef.current, Math.max(notificationPageSize, items.length));
+        return;
+      }
+      const version = ++countRevision.current;
+      void fetchUnreadNotificationCount(userId).then((count) => {
+        if (mounted.current && version === countRevision.current) setUnreadCount(count);
+      }).catch(() => {
+        if (mounted.current && version === countRevision.current) setUnreadCount(null);
+      });
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") update(); };
+    window.addEventListener(adminNotificationReceivedEvent, update);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener(adminNotificationReceivedEvent, update);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [items.length, open, refresh, userId]);
 
   const changeQuery = (changes: Partial<NotificationQuery>) => {
     if (busyRef.current) return;

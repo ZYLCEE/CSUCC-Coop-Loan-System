@@ -16,15 +16,15 @@ export default function ProfileForm() {
   });
 
   const handleSave = () => {
-    console.log("Saving profile:", formData);
+    // Legacy preview has no connected profile API.
   };
 
   const handleChangePassword = () => {
-    console.log("Change password clicked");
+    // The current password form lives in ProfileWorkspace.
   };
 
   return (
-    <div className="bg-white rounded-[14px] shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-[#E5E7EB] p-3 h-full flex flex-col">
+    <section className="space-y-3"><p role="note" className="text-support text-portal-muted">Legacy profile preview: these controls are unavailable and do not save changes. Use My Profile.</p><fieldset disabled><div className="bg-white rounded-[14px] shadow-[0_2px_12px_rgba(0,0,0,0.06)] border border-[#E5E7EB] p-3 h-full flex flex-col">
       {/* Header */}
       <h2 className="text-[14px] font-semibold text-[#111827] mb-3">Edit Profile</h2>
 
@@ -88,6 +88,6 @@ export default function ProfileForm() {
           Change Password
         </button>
       </div>
-    </div>
+    </div></fieldset></section>
   );
 }

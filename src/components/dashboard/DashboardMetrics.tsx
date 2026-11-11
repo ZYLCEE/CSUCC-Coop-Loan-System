@@ -20,21 +20,21 @@ export default function DashboardMetrics(props: DashboardMetricsProps) {
   const when = props.period === "last-month" ? "last month" : yearly ? "this year" : "this month";
   return (
     <section aria-label="Portfolio statistics" className="grid grid-cols-1 gap-4 md:grid-cols-2 min-[75rem]:grid-cols-4">
-      <StatCard icon={Clock} iconBgColor="#FFF7ED" iconColor="#D97706"
+      <StatCard icon={Clock} iconBgColor="var(--status-warning-surface)" iconColor="var(--status-warning)"
         label="Pending Applications" value={props.pending?.toLocaleString("en-PH") ?? "—"}
         subtitle="Awaiting review" loading={props.loansLoading}
         unavailable={props.loansError ? "Application count unavailable" : undefined}
         onRetry={props.loansError ? props.retryLoans : undefined} />
-      <StatCard icon={Users} iconBgColor="#EFF6FF" iconColor="#2563EB"
+      <StatCard icon={Users} iconBgColor="var(--status-info-surface)" iconColor="var(--status-info)"
         label="Active Members" value={props.activeMembers?.toLocaleString("en-PH") ?? "—"}
         subtitle="Registered active members" loading={props.membersLoading}
         unavailable={props.membersError ? "Member count unavailable" : undefined}
         onRetry={props.membersError ? props.retryMembers : undefined} />
-      <StatCard icon={TrendingUp} iconBgColor="#F0FDF4" iconColor="#16A34A"
+      <StatCard icon={TrendingUp} iconBgColor="var(--status-success-surface)" iconColor="var(--status-success)"
         label={yearly ? "Year-to-Date Collections" : "Monthly Collections"} value="—"
         subtitle={`Payments collected ${when}`}
         unavailable="Confirmed collections unavailable" />
-      <StatCard icon={Wallet} iconBgColor="#FAF5FF" iconColor="#9333EA"
+      <StatCard icon={Wallet} iconBgColor="var(--status-neutral-surface)" iconColor="var(--coop-primary)"
         label={yearly ? "Year-to-Date Disbursement" : "Monthly Disbursement"}
         value={props.disbursement === null ? "—" : formatPeso(props.disbursement)}
         subtitle={`Loans released ${when}`} loading={props.loansLoading}

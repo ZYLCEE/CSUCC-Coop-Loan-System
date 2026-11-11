@@ -1,8 +1,79 @@
 @import "tailwindcss";
+@import "../components/ui/portal-ui.css";
 
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Cooperative palette and administrative surfaces */
+  --coop-primary: #005a3c;
+  --coop-primary-dark: #003e2b;
+  --coop-dashboard-green: #155d3b;
+  --coop-accent: #ffda00;
+  --surface-page: #f5f6f8;
+  --surface-card: #ffffff;
+  --surface-muted: #f1f5f9;
+  --text-primary: #17212f;
+  --text-secondary: #64748b;
+  --text-muted: #526278;
+  --border-default: #e2e8f0;
+  --border-subtle: #edf1f5;
+  --border-control: #d1d5db;
+
+  /* Use status text against its paired surface. */
+  --status-success: #166534;
+  --status-success-surface: #dcfce7;
+  --status-warning: #854d0e;
+  --status-warning-surface: #fef3c7;
+  --status-danger: #991b1b;
+  --status-danger-surface: #fee2e2;
+  --status-info: #1e40af;
+  --status-info-surface: #dbeafe;
+  --status-neutral: #475569;
+  --status-neutral-surface: var(--surface-muted);
+
+  --font-size-page-title: 1.5rem;
+  --font-size-section-title: 1.125rem;
+  --font-size-card-title: 1rem;
+  --font-size-body: 0.875rem;
+  --font-size-label: var(--font-size-body);
+  --font-size-support: 0.8125rem;
+  --font-size-caption: 0.75rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+  --line-height-heading: 1.25;
+  --line-height-copy: 1.5;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-page: var(--space-6);
+  --space-section: var(--space-6);
+  --space-card: var(--space-5);
+  --radius-control: 0.5rem;
+  --radius-card: 0.75rem;
+  --radius-dialog: 1rem;
+  --control-height-default: 2.5rem;
+  --control-height-compact: 2.25rem;
+  --icon-size-standard: 1.125rem;
+  --icon-size-compact: 0.875rem;
+  --shadow-card: 0 1px 3px rgb(23 33 47 / 6%);
+  --shadow-elevated: 0 4px 12px rgb(23 33 47 / 10%);
+  --shadow-dropdown: 0 8px 24px rgb(23 33 47 / 12%);
+  --shadow-dialog: 0 16px 40px rgb(23 33 47 / 18%);
+  --shadow-focus: 0 0 0 3px rgb(0 90 60 / 20%);
+
+  --portal-navbar-height: 72px;
+  --portal-sidebar-expanded: 208px;
+  --portal-sidebar-collapsed: 76px;
+  --portal-content-padding-y: var(--space-page);
+  --portal-transition-duration: 300ms;
 }
 
 @theme inline {
@@ -10,6 +81,71 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-inter);
   --font-mono: var(--font-geist-mono);
+
+  --color-coop-primary: var(--coop-primary);
+  --color-coop-primary-dark: var(--coop-primary-dark);
+  --color-coop-dashboard-green: var(--coop-dashboard-green);
+  --color-coop-accent: var(--coop-accent);
+  --color-surface-page: var(--surface-page);
+  --color-surface-card: var(--surface-card);
+  --color-surface-muted: var(--surface-muted);
+  --color-portal-primary: var(--text-primary);
+  --color-portal-secondary: var(--text-secondary);
+  --color-portal-muted: var(--text-muted);
+  --color-portal-border: var(--border-default);
+  --color-portal-border-subtle: var(--border-subtle);
+  --color-portal-border-control: var(--border-control);
+  --color-status-success: var(--status-success);
+  --color-status-success-surface: var(--status-success-surface);
+  --color-status-warning: var(--status-warning);
+  --color-status-warning-surface: var(--status-warning-surface);
+  --color-status-danger: var(--status-danger);
+  --color-status-danger-surface: var(--status-danger-surface);
+  --color-status-info: var(--status-info);
+  --color-status-info-surface: var(--status-info-surface);
+  --color-status-neutral: var(--status-neutral);
+  --color-status-neutral-surface: var(--status-neutral-surface);
+
+  --text-page-title: var(--font-size-page-title);
+  --text-page-title--line-height: var(--line-height-heading);
+  --text-page-title--font-weight: var(--font-weight-bold);
+  --text-section-title: var(--font-size-section-title);
+  --text-section-title--line-height: var(--line-height-heading);
+  --text-section-title--font-weight: var(--font-weight-semibold);
+  --text-card-title: var(--font-size-card-title);
+  --text-card-title--line-height: var(--line-height-heading);
+  --text-card-title--font-weight: var(--font-weight-semibold);
+  --text-body: var(--font-size-body);
+  --text-body--line-height: var(--line-height-copy);
+  --text-body--font-weight: var(--font-weight-regular);
+  --text-label: var(--font-size-label);
+  --text-label--line-height: var(--line-height-copy);
+  --text-label--font-weight: var(--font-weight-medium);
+  --text-button-label: var(--font-size-label);
+  --text-button-label--line-height: var(--line-height-heading);
+  --text-button-label--font-weight: var(--font-weight-semibold);
+  --text-support: var(--font-size-support);
+  --text-support--line-height: var(--line-height-copy);
+  --text-support--font-weight: var(--font-weight-regular);
+  --text-caption: var(--font-size-caption);
+  --text-caption--line-height: var(--line-height-copy);
+  --text-caption--font-weight: var(--font-weight-regular);
+
+  --spacing-portal-page: var(--space-page);
+  --spacing-portal-section: var(--space-section);
+  --spacing-portal-card: var(--space-card);
+  --spacing-control: var(--control-height-default);
+  --spacing-control-compact: var(--control-height-compact);
+  --spacing-icon: var(--icon-size-standard);
+  --spacing-icon-compact: var(--icon-size-compact);
+  --radius-portal-control: var(--radius-control);
+  --radius-portal-card: var(--radius-card);
+  --radius-portal-dialog: var(--radius-dialog);
+  --shadow-portal-card: var(--shadow-card);
+  --shadow-portal-elevated: var(--shadow-elevated);
+  --shadow-portal-dropdown: var(--shadow-dropdown);
+  --shadow-portal-dialog: var(--shadow-dialog);
+  --shadow-portal-focus: var(--shadow-focus);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -27,18 +163,231 @@ body {
 
 /* The administrative portal uses light surfaces independently of device theme. */
 .portal-shell {
-  color: #0f172a;
+  --portal-sidebar-width: var(--portal-sidebar-expanded);
+  --portal-content-offset: var(--portal-sidebar-width);
+  --portal-content-padding-x: var(--space-page);
+
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding-block-start: var(--portal-navbar-height);
+  background: var(--surface-page);
+  color: var(--text-primary);
   color-scheme: light;
+}
+
+.portal-shell[data-sidebar-collapsed="true"] {
+  --portal-sidebar-width: var(--portal-sidebar-collapsed);
+}
+
+.admin-portal-shell {
+  --portal-navbar-height: 105px;
+  --portal-watermark-size: min(560px, calc(100vw - var(--portal-content-offset) - 48px), calc(100dvh - var(--portal-navbar-height) - 48px));
+  display: flex;
+  flex-direction: column;
+  isolation: isolate;
+  padding-block-start: 0;
+}
+
+.admin-portal-shell > .portal-content { flex: 1; }
+
+.admin-portal-shell > .coop-portal-header {
+  position: sticky;
+  top: 0;
+  inset-inline: auto;
+  display: flex;
+  justify-content: center;
+  height: auto;
+  min-height: 104px;
+  margin-inline-start: var(--portal-content-offset);
+  padding: 4px var(--portal-content-padding-x);
+  border-bottom: 1px solid #d8e4dc;
+  box-shadow: 0 2px 0 #e7c84b;
+  transition: margin-inline-start var(--portal-transition-duration);
+}
+
+.coop-header-inner.coop-letterhead {
+  display: grid;
+  grid-template-columns: clamp(112px, 14vw, 220px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  min-width: 0;
+}
+
+.coop-letterhead-seal {
+  justify-self: center;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+}
+
+.coop-letterhead-copy {
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.coop-letterhead-name {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(17px, 1.5vw, 20px);
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--coop-primary-dark);
+}
+
+.coop-letterhead-contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0 10px;
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--text-primary);
+}
+
+.coop-letterhead-registration {
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: var(--coop-primary-dark);
+}
+
+.coop-letterhead-affiliations {
+  margin-top: 1px;
+  font-size: 10px;
+  line-height: 1.15;
+  color: var(--text-secondary);
+}
+
+.coop-portal-utilities {
+  display: flex;
+  justify-self: end;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.portal-live-status-slot { display: flex; align-items: center; }
+
+.portal-footer {
+  margin-inline-start: var(--portal-content-offset);
+  padding: 6px var(--portal-content-padding-x);
+  border-top: 2px solid #e7c84b;
+  background: #f4f8f5;
+  text-align: center;
+  transition: margin-inline-start var(--portal-transition-duration);
+}
+
+.portal-footer p {
+  margin: 0;
+  color: var(--coop-primary-dark);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 18px;
+  font-style: italic;
+  line-height: 1.4;
+}
+
+.admin-portal-shell .portal-loan-alert-stack {
+  top: calc(var(--portal-navbar-height) + 12px);
+}
+
+/* One stationary seal across the main workspace, including empty panels.
+   Multiply preserves text contrast over both white and tinted table rows. */
+.portal-content-watermark {
+  position: fixed;
+  top: calc(var(--portal-navbar-height) + (100dvh - var(--portal-navbar-height)) / 2);
+  left: calc(var(--portal-content-offset) + (100vw - var(--portal-content-offset)) / 2);
+  z-index: 2;
+  width: var(--portal-watermark-size);
+  height: var(--portal-watermark-size);
+  transform: translate(-50%, -50%);
+  background: url("/images/coop-official-seal.jpg") center / contain no-repeat;
+  opacity: 0.065;
+  filter: blur(1.25px) saturate(0.65);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+
+@media (900px <= width < 1200px) {
+  .coop-header-inner.coop-letterhead { grid-template-columns: 108px minmax(0, 1fr) auto; gap: 12px; }
+  .admin-portal-shell > .coop-portal-header { padding-inline: 16px; }
+  .coop-letterhead-name { font-size: 17px; }
+  .coop-date-pill { padding-inline: 8px; font-size: 11px; }
+}
+
+@media (width < 900px) {
+  .coop-header-inner.coop-letterhead { grid-template-columns: 80px minmax(0, 1fr); gap: 6px 12px; }
+  .coop-letterhead-seal { width: 80px; height: 80px; }
+  .coop-portal-utilities { grid-column: 1 / -1; justify-self: center; }
+}
+
+@media (width < 640px) {
+  .coop-header-inner.coop-letterhead { grid-template-columns: 64px minmax(0, 1fr); gap: 6px 8px; }
+  .coop-letterhead-seal { width: 64px; height: 64px; }
+  .coop-letterhead-name { font-size: 14px; line-height: 1.2; }
+  .coop-letterhead-contact, .coop-letterhead-registration { font-size: 10px; }
+  .coop-letterhead-affiliations { font-size: 10px; line-height: 1.25; }
+  .coop-portal-utilities { flex-wrap: wrap; flex-shrink: 1; gap: 6px; }
+  .coop-date-pill { padding-inline: 8px; font-size: 11px; }
+  .portal-footer p { font-size: 14px; }
+}
+
+.portal-navbar {
+  inset-inline-start: var(--portal-content-offset);
+  height: var(--portal-navbar-height);
+  padding-inline: var(--portal-content-padding-x);
+  transition: inset-inline-start var(--portal-transition-duration);
+}
+
+.portal-content {
+  min-width: 0;
+  margin-inline-start: var(--portal-content-offset);
+  padding: var(--portal-content-padding-y) var(--portal-content-padding-x);
+  transition: margin-inline-start var(--portal-transition-duration);
+}
+
+.portal-sidebar-dismiss {
+  display: none;
+}
+
+@media (width < 768px) {
+  .portal-shell {
+    --portal-content-offset: var(--portal-sidebar-collapsed);
+    --portal-content-padding-x: var(--space-4);
+  }
+
+  .portal-shell[data-sidebar-collapsed="false"] .portal-sidebar-dismiss {
+    position: fixed;
+    z-index: 15;
+    inset: 0;
+    display: block;
+    background: rgb(23 33 47 / 32%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .portal-shell {
+    --portal-transition-duration: 0ms;
+  }
 }
 
 .portal-shell input::placeholder,
 .portal-shell textarea::placeholder {
-  color: #64748b;
+  color: var(--text-secondary);
   opacity: 1;
 }
 
-.portal-shell input,
-.portal-shell select,
-.portal-shell textarea {
-  background-color: #fff;
+.portal-shell :is(input, select, textarea):not(.ui-field) {
+  background-color: var(--surface-card);
+}
+
+.action-backdrop {
+  backdrop-filter: blur(5px);
+}
+
+body:has(.action-backdrop) {
+  overflow: hidden;
 }

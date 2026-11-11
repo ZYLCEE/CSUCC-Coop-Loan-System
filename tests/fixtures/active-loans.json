@@ -1,0 +1,37 @@
+[
+  {
+    "id": "loan-released", "application_id": "APP-RELEASED", "member_name": "Maria Dela Cruz", "loan_type": "Regular",
+    "amount": 12000, "monthly_payment": 1200, "status": "released", "tenure_months": 12, "date_submitted": "2026-01-01",
+    "members": { "member_id": "CSUCC-2026-0001", "membership_type": "Regular" }, "payments": []
+  },
+  {
+    "id": "loan-paid", "application_id": "APP-PAID", "member_name": "Ana Santos", "loan_type": "Emergency",
+    "amount": 12000, "monthly_payment": 1200, "status": "released", "tenure_months": 12, "date_submitted": "2026-01-02",
+    "members": { "member_id": "CSUCC-2026-0002", "membership_type": "Associate" },
+    "payments": [{ "payment_status": "posted", "payment_amount": 3600, "principal_amount": 3000 }]
+  },
+  {
+    "id": "loan-partial", "application_id": "APP-PARTIAL", "member_name": "Luis Cruz", "loan_type": "Regular",
+    "amount": 12000, "monthly_payment": 1200, "status": "released", "tenure_months": 12, "date_submitted": "2026-01-03",
+    "members": { "member_id": "CSUCC-2026-0003", "membership_type": "Regular" },
+    "payments": [{ "payment_status": "posted", "payment_amount": 4100, "principal_amount": 3500 }]
+  },
+  {
+    "id": "loan-overdue", "application_id": "APP-OVERDUE", "member_name": "Jose Reyes", "loan_type": "Emergency",
+    "amount": 12000, "monthly_payment": 1200, "status": "overdue", "tenure_months": 12, "date_submitted": "2026-01-04",
+    "members": { "member_id": "CSUCC-2026-0004", "membership_type": "Regular" },
+    "payments": [{ "payment_status": "posted", "payment_amount": 2400, "principal_amount": 2000 }]
+  },
+  {
+    "id": "loan-completed", "application_id": "APP-FULL", "member_name": "Nina Lopez", "loan_type": "Emergency",
+    "amount": 12000, "monthly_payment": 1200, "status": "completed", "tenure_months": 12, "date_submitted": "2026-01-05",
+    "members": { "member_id": "CSUCC-2026-0005", "membership_type": "Associate" },
+    "payments": [{ "payment_status": "posted", "payment_amount": 14400, "principal_amount": 12000 }]
+  },
+  {
+    "id": "loan-legacy", "application_id": "APP-LEGACY", "member_name": "Pedro Garcia", "loan_type": "Regular",
+    "amount": 12000, "monthly_payment": 1200, "status": "released", "tenure_months": 12, "date_submitted": "2026-01-06",
+    "members": { "member_id": "CSUCC-2026-0006", "membership_type": "Regular" },
+    "payments": [{ "payment_status": "posted", "payment_amount": 500, "principal_amount": null }]
+  }
+]

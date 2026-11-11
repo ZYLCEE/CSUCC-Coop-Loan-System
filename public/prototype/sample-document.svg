@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="1040" viewBox="0 0 800 1040">
+ <rect width="800" height="1040" fill="#f4f6f8"/><rect x="40" y="40" width="720" height="960" rx="16" fill="white" stroke="#dce4eb"/>
+ <g font-family="Arial,sans-serif" fill="#172b3f"><text x="80" y="112" font-size="20" font-weight="bold" fill="#155e40">CSUCC MPC · PROTOTYPE</text><text x="80" y="170" font-size="32" font-weight="bold">Sample supporting document</text><path d="M80 200h640" stroke="#dce4eb"/>
+ <text x="80" y="255" font-size="21">Applicant: Sample Member</text><text x="80" y="300" font-size="21">Member number: SAMPLE-0000</text><text x="80" y="345" font-size="21">Purpose: Committee portal demonstration</text>
+ <rect x="80" y="400" width="640" height="150" rx="10" fill="#eff6f2"/><text x="110" y="450" font-size="25" font-weight="bold" fill="#155e40">FICTIONAL SAMPLE ONLY</text><text x="110" y="490" font-size="19">This document does not identify a real person</text><text x="110" y="520" font-size="19">and is not evidence for an actual loan.</text>
+ <text x="80" y="630" font-size="20">Sample verification checklist</text><text x="95" y="680" font-size="18">• Identity information displayed for UI preview</text><text x="95" y="720" font-size="18">• Supporting document review demonstrated</text><text x="95" y="760" font-size="18">• No real consent, signature or financial record</text><text x="80" y="925" font-size="18" fill="#65768a">Generated solely for the isolated prototype portal.</text></g>
+</svg>

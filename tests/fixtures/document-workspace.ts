@@ -1,0 +1,8 @@
+import type {DocumentWorkspace} from '../../src/lib/documentWorkspace';
+export const documentFixture:DocumentWorkspace={
+ capabilities:{reviews:true,sharing:true,canReview:true},warnings:[],
+ applications:Array.from({length:23},(_,index)=>({id:'30000000-0000-0000-0000-'+String(index+1).padStart(12,'0'),applicationId:'APP-DOC-'+(index+1),loanType:'Business',loanStatus:'pending',memberId:'20000000-0000-0000-0000-000000000001',memberNumber:'CSUCC-TEST-'+(index+1),memberName:index===0?'Synthetic Maria Cruz':'Synthetic Member '+(index+1),membershipType:index%2?'associate':'regular',requiredKinds:['validId','payslip'],submittedAt:new Date(Date.UTC(2026,10,23-index)).toISOString(),
+ documents:(index===1?['validId']:['validId','payslip']).map((kind,kindIndex)=>({id:'40000000-0000-0000-0000-'+String(index*10+kindIndex+1).padStart(12,'0'),kind:kind as 'validId'|'payslip',versions:[{id:null,version:1,name:kind+'.pdf',contentType:'application/pdf',size:100,uploadedAt:new Date(Date.UTC(2026,10,23-index)).toISOString(),uploadedBy:'Synthetic member'}],reviews:[]}))})),
+ shared:[{id:'50000000-0000-0000-0000-000000000001',source:'shared',title:'Member Guide',category:'Guides',description:'Synthetic guide',filename:'guide.pdf',contentType:'application/pdf',size:100,createdAt:'2026-11-01T00:00:00Z',updatedAt:'2026-11-01T00:00:00Z',uploadedBy:'Synthetic administrator',audience:'all',recipients:[],status:'published'},
+ {id:'legacy:documents/Test-document.pdf',source:'legacy',title:'Test document.pdf',category:'Staff library',description:'',filename:'Test document.pdf',contentType:'application/pdf',size:100,createdAt:'2026-01-01T00:00:00Z',updatedAt:'2026-01-01T00:00:00Z',uploadedBy:'Not recorded',audience:'staff',recipients:[],status:'staff_only'}]
+};

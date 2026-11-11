@@ -1,5 +1,6 @@
 "use client";
 
+import { ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
 import { useState } from "react";
 
 export default function Security() {
@@ -13,13 +14,8 @@ export default function Security() {
 
   const [showRevokeModal, setShowRevokeModal] = useState(false);
 
-  const handleRevokeSession = () => {
-    setShowRevokeModal(false);
-    console.log("Session revoked");
-  };
-
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <section className="space-y-3"><p role="note" className="text-support text-portal-muted">Legacy preview: these controls are unavailable and do not save changes. Use the current portal settings.</p><fieldset disabled><div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Password Policy Card */}
       <div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-5">
         <h2 className="text-[20px] font-bold text-[#1F2937] mb-5">Password Policy</h2>
@@ -122,31 +118,8 @@ export default function Security() {
         <p className="text-sm text-[#6B7280]">No session data loaded.</p>
       </div>
 
-      {/* Revoke Session Modal */}
-      {showRevokeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] w-full max-w-md p-6">
-            <h2 className="text-[20px] font-bold text-[#1F2937] mb-2">Revoke Session</h2>
-            <p className="text-[15px] text-[#6B7280] mb-6">
-              Are you sure you want to revoke this active administrator session?
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setShowRevokeModal(false)}
-                className="px-4 h-10 bg-white border border-[#E5E7EB] rounded-[10px] text-[15px] font-medium text-[#1F2937] hover:bg-[#F9FAFB]"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleRevokeSession}
-                className="px-4 h-10 bg-[#EF4444] rounded-[10px] text-[15px] font-medium text-white hover:bg-[#DC2626]"
-              >
-                Revoke
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
+      {showRevokeModal && <ConfirmActionDialog title="Revoke session" tone="destructive" question="This legacy preview has no connected service. No operation will be performed." confirmLabel="Unavailable" disabled onClose={() => setShowRevokeModal(false)} onConfirm={() => {}} />}
+
+    </div></fieldset></section>
   );
 }

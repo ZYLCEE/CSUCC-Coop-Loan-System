@@ -11,7 +11,10 @@ const row = (overrides = {}) => ({ id: "notice-1", user_id: recipient, title: "A
 
 function loadService(responses, user = { id: recipient, app_metadata: { role: "admin", account_status: "active" } }) {
   const calls = [];
+  const realtime=[];let removed=0;
   const client = {
+    channel(){return {on(event,filter,callback){realtime.push({event,filter,callback});return this;},subscribe(){return this;}};},
+    async removeChannel(){removed++;},
     auth: { getSession: async () => ({ data: { session: user ? { user } : null }, error: null }) },
     from(table) {
       const call = { table, filters: [], orders: [] };
@@ -36,7 +39,7 @@ function loadService(responses, user = { id: recipient, app_metadata: { role: "a
   };
   const exports = {};
   new Function("require", "exports", compiled)(name => dependencies[name], exports);
-  return { ...exports, calls };
+  return { ...exports, calls,realtime,removed:()=>removed };
 }
 
 test("unread counts are exact, recipient-scoped, and distinguish zero from unavailable", async () => {
@@ -56,7 +59,7 @@ test("list queries request only safe fields, newest first, with real pagination 
   assert.deepEqual(service.calls[0].range, [20, 39]);
   assert.deepEqual(service.calls[0].filters, [["user_id", recipient], ["read", false]]);
   assert.deepEqual(service.calls[0].orders, [["created_at", { ascending: false }], ["id", { ascending: false }]]);
-  assert.equal(service.calls[0].select.columns, "id,user_id,title,message,type,read,created_at");
+  assert.equal(service.calls[0].select.columns, "id,user_id,title,message,type,read,created_at,data,activity_category");
 });
 
 test("foreign-recipient or broadcast records fail closed even if an overly broad policy returns them", async () => {
@@ -107,6 +110,7 @@ test("read failures and denied bulk writes produce errors", async () => {
 
 test("notification destinations use only existing role-prefixed routes", () => {
   const service = loadService([]);
+  assert.equal(service.notificationHref("loan_submitted", "/super-admin"), "/super-admin/loan-applications");
   assert.equal(service.notificationHref("loan_approval", "/admin"), "/admin/loan-applications");
   assert.equal(service.notificationHref("payment_reminder", "/super-admin"), "/super-admin/active-loans");
   assert.equal(service.notificationHref("info", ""), null);
@@ -116,7 +120,7 @@ test("notification destinations use only existing role-prefixed routes", () => {
 test("read/category/search filters run on the server and keep the recipient predicate", async () => {
   const service = loadService([{ data: [], count: 0, error: null }]);
   await service.fetchAdminNotifications(recipient, "read", 0, 20, { search: 'A, (test) "quoted"', category: "loans" });
-  assert.deepEqual(service.calls[0].filters, [["user_id", recipient], ["read", true], ["type", ["loan_approval", "loan_rejection"]]]);
+  assert.deepEqual(service.calls[0].filters, [["user_id", recipient], ["read", true], ["activity_category", "loans"]]);
   assert.ok(service.calls[0].or.startsWith('title.ilike."%A, (test)'));
   assert.ok(service.calls[0].or.includes('message.ilike.'));
   assert.ok(service.calls[0].or.includes('\\"quoted\\"'));
@@ -128,4 +132,25 @@ test("relative timestamps handle recent and invalid dates", () => {
   assert.equal(service.notificationRelativeTime("2026-10-28T04:00:00Z", now), "5 minutes ago");
   assert.equal(service.notificationRelativeTime("2026-10-28T04:04:45Z", now), "Just now");
   assert.equal(service.notificationRelativeTime("invalid", now), "Time unavailable");
+});
+
+test("structured activity is parsed without trusting arbitrary destinations",async()=>{
+ const service=loadService([{data:[row({activity_category:"accounts",data:{actorName:"Synthetic Member",actorRole:"member",entityType:"member",entityKey:"SAMPLE-1",href:"javascript:bad"}})],count:1,error:null}]);
+ const notice=(await service.fetchAdminNotifications(recipient,"all")).items[0];
+ assert.equal(notice.category,"accounts");assert.equal(notice.actorRole,"member");assert.equal("href" in notice,false);
+ assert.equal(service.notificationHref(notice.type,"/admin",notice),"/admin/all-accounts");
+ assert.equal(service.notificationHref("info","/admin",{entityType:"javascript:bad",entityKey:"https://outside.invalid"}),null);
+});
+
+test("realtime subscriptions are recipient-filtered, coalesce changes and stop on cleanup",async()=>{
+ const service=loadService([]),oldWindow=globalThis.window,oldDocument=globalThis.document;
+ globalThis.window={setInterval:()=>1,clearInterval(){},addEventListener(){},removeEventListener(){}};
+ globalThis.document={visibilityState:"visible"};let changes=0;
+ try{
+  const stop=service.watchAdminNotifications(recipient,()=>changes++);
+  assert.deepEqual(service.realtime.map(row=>row.filter.event),["INSERT","UPDATE"]);
+  assert.equal(service.realtime.every(row=>row.filter.table==="notifications"&&row.filter.filter==="user_id=eq."+recipient),true);
+  service.realtime[0].callback();service.realtime[1].callback();await new Promise(resolve=>setTimeout(resolve,200));assert.equal(changes,1);
+  stop();service.realtime[0].callback();await new Promise(resolve=>setTimeout(resolve,200));assert.equal(changes,1);assert.equal(service.removed(),1);
+ }finally{if(oldWindow===undefined)delete globalThis.window;else globalThis.window=oldWindow;if(oldDocument===undefined)delete globalThis.document;else globalThis.document=oldDocument;}
 });

@@ -3,25 +3,29 @@
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import { useEffect, useMemo, useState } from "react";
 import Toolbar, {
+  LoanPaginationControls,
   LoanSortOption,
   LoanStatusFilter,
 } from "@/components/loan-applications/Toolbar";
 import LoanApplicationsTable from "@/components/loan-applications/LoanApplicationsTable";
+import { Card } from "@/components/ui/Card";
+import { LoadingState } from "@/components/ui/Feedback";
+import { Pagination } from "@/components/ui/Pagination";
 import { fetchLoanApplications, LoanApplication } from "@/lib/api";
-import { MembershipTypeFilter } from "@/lib/membership";
+import { MembershipTypeFilter, normalizeMembershipMemberId } from "@/lib/membership";
+import { getLoanTypeLabel } from "@/lib/loanTypeLabel";
 import { getSupabaseClient } from "@/lib/supabase";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
+import {workflowRequest} from "@/lib/applicationWorkflowRequest";
+import type {WorkflowSummary} from "@/lib/applicationWorkflow";
+import PortalPageHeading from "@/components/shared/PortalPageHeading";
 
-interface AppliedFilters {
+interface ApplicationFilters {
   search: string;
-  memberId: string;
   loanType: string;
   status: LoanStatusFilter;
   membershipType: MembershipTypeFilter;
 }
-
-const normalizeFilterValue = (value: string) =>
-  value.trim().replace(/^CSUCC-/i, "").toLowerCase();
 
 const getApplicationTime = (application: LoanApplication) => {
   const parsedDate = Date.parse(application.date);
@@ -30,14 +34,12 @@ const getApplicationTime = (application: LoanApplication) => {
 
 export default function LoanApplicationsPage() {
   const [applications, setApplications] = useState<LoanApplication[]>([]);
+  const [workflow,setWorkflow]=useState<Record<string,WorkflowSummary>>({});
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [memberIdInput, setMemberIdInput] = useState("");
-  const [filters, setFilters] = useState<AppliedFilters>({
+  const [filters, setFilters] = useState<ApplicationFilters>({
     search: "",
-    memberId: "",
     loanType: "All Loan Types",
     status: "All Status",
     membershipType: "All Members",
@@ -56,10 +58,11 @@ export default function LoanApplicationsPage() {
 
   useEffect(() => {
     let isActive = true;
-    void fetchLoanApplications()
-      .then((data) => {
+    void Promise.all([fetchLoanApplications(),workflowRequest<WorkflowSummary[]>("operation=summary")])
+      .then(([data,summaries]) => {
         if (isActive) {
           setApplications(data);
+          setWorkflow(Object.fromEntries(summaries.map(item=>[item.applicationId,item])));
           setLoadError("");
         }
       })
@@ -96,23 +99,18 @@ export default function LoanApplicationsPage() {
   }, [applications]);
 
   const filteredApplications = useMemo(() => {
-    const search = normalizeFilterValue(filters.search);
-    const memberId = normalizeFilterValue(filters.memberId);
+    const search = normalizeMembershipMemberId(filters.search);
 
     return applications.filter((application) => {
       const searchableText = [
         application.id,
         application.member,
         application.memberId,
-        application.type,
+        getLoanTypeLabel(application.type),
       ]
         .join(" ")
         .toLowerCase();
-      const normalizedMemberId = normalizeFilterValue(application.memberId);
-
-      const matchesSearch = search === "" || searchableText.includes(search);
-      const matchesMemberId =
-        memberId === "" || normalizedMemberId.includes(memberId);
+      const matchesSearch = searchableText.includes(search);
       const matchesLoanType =
         filters.loanType === "All Loan Types" || application.type === filters.loanType;
       const matchesStatus =
@@ -124,7 +122,6 @@ export default function LoanApplicationsPage() {
 
       return (
         matchesSearch &&
-        matchesMemberId &&
         matchesLoanType &&
         matchesStatus &&
         matchesMembershipType
@@ -154,34 +151,12 @@ export default function LoanApplicationsPage() {
   const showingTo = Math.min(pageStartIndex + pageSize, sortedApplications.length);
   const hasActiveFilters =
     filters.search.trim() !== "" ||
-    filters.memberId.trim() !== "" ||
     filters.loanType !== "All Loan Types" ||
     filters.status !== "All Status" ||
     filters.membershipType !== "All Members";
 
-  const applyTextFilters = () => {
-    setFilters((current) => ({
-      ...current,
-      search: searchInput,
-      memberId: memberIdInput,
-    }));
-    setCurrentPage(1);
-  };
-
-  const updateStatusFilter = (status: LoanStatusFilter) => {
-    setFilters((current) => ({ ...current, status }));
-    setCurrentPage(1);
-  };
-
-  const updateLoanTypeFilter = (loanType: string) => {
-    setFilters((current) => ({ ...current, loanType }));
-    setCurrentPage(1);
-  };
-
-  const updateMembershipTypeFilter = (
-    membershipType: MembershipTypeFilter
-  ) => {
-    setFilters((current) => ({ ...current, membershipType }));
+  const updateFilters = (changes: Partial<ApplicationFilters>) => {
+    setFilters((current) => ({ ...current, ...changes }));
     setCurrentPage(1);
   };
 
@@ -212,7 +187,7 @@ export default function LoanApplicationsPage() {
         application.memberId,
         application.member,
         application.membershipType ?? "Not Set",
-        application.type,
+        getLoanTypeLabel(application.type),
         application.amount,
         application.status,
         application.date,
@@ -234,33 +209,24 @@ export default function LoanApplicationsPage() {
   };
 
   return (
-    <div className="overflow-hidden rounded-[8px] border border-[#E1E7EF] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+    <Card padded={false} className="overflow-hidden">
+      <PortalPageHeading section="loan-applications" />
       <Toolbar
-        searchValue={searchInput}
-        memberIdValue={memberIdInput}
+        searchValue={filters.search}
         loanTypeFilter={filters.loanType}
         statusFilter={filters.status}
         membershipTypeFilter={filters.membershipType}
-        sortOption={sortOption}
-        pageSize={pageSize}
         loanTypeOptions={loanTypeOptions}
-        onSearchChange={setSearchInput}
-        onMemberIdChange={setMemberIdInput}
-        onApplyFilters={applyTextFilters}
-        onLoanTypeChange={updateLoanTypeFilter}
-        onStatusFilterChange={updateStatusFilter}
-        onMembershipTypeChange={updateMembershipTypeFilter}
-        onSortChange={updateSortOption}
-        onPageSizeChange={updatePageSize}
+        onSearchChange={(search) => updateFilters({ search })}
+        onLoanTypeChange={(loanType) => updateFilters({ loanType })}
+        onStatusFilterChange={(status) => updateFilters({ status })}
+        onMembershipTypeChange={(membershipType) => updateFilters({ membershipType })}
         onExport={exportApplications}
       />
-
       {loading ? (
-        <div className="border-t border-[#E5E7EB] px-4 py-10 text-center text-[14px] font-medium text-[#64748B]">
-          Loading applications...
-        </div>
+        <LoadingState label="Loading applications..." />
       ) : loadError ? (
-        <div role="alert" className="border-t border-[#E5E7EB] px-4 py-10 text-center text-sm font-medium text-[#B91C1C]">
+        <div role="alert" className="border-t border-portal-border px-4 py-10 text-center text-sm font-medium text-status-danger">
           {loadError}
           <button
             type="button"
@@ -271,19 +237,34 @@ export default function LoanApplicationsPage() {
           </button>
         </div>
       ) : (
-        <LoanApplicationsTable
-          applications={paginatedApplications}
-          currentPage={activePage}
-          totalPages={totalPages}
-          totalItems={sortedApplications.length}
-          showingFrom={showingFrom}
-          showingTo={showingTo}
-          hasActiveFilters={hasActiveFilters}
-          readOnly={readOnly}
-          onPageChange={setCurrentPage}
-          onApplicationUpdated={refreshApplications}
-        />
+        <>
+          <LoanApplicationsTable
+            applications={paginatedApplications}
+            hasActiveFilters={hasActiveFilters}
+            readOnly={readOnly}
+            onApplicationUpdated={refreshApplications}
+            workflow={workflow}
+          />
+          <Pagination
+            currentPage={activePage}
+            totalPages={totalPages}
+            totalItems={sortedApplications.length}
+            showingFrom={showingFrom}
+            showingTo={showingTo}
+            onPageChange={setCurrentPage}
+            itemLabel="applications"
+            showStepButtons
+            controls={
+              <LoanPaginationControls
+                sortOption={sortOption}
+                pageSize={pageSize}
+                onSortChange={updateSortOption}
+                onPageSizeChange={updatePageSize}
+              />
+            }
+          />
+        </>
       )}
-    </div>
+    </Card>
   );
 }

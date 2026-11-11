@@ -10,8 +10,6 @@ export interface ProfileResponse {
   profile: EditableProfile;
   account: { id: string; email: string; pendingEmail: string | null; role: string; status: string; createdAt: string; lastSignInAt: string | null; emailConfirmed: boolean };
   memberLinked: boolean;
-  activity: Array<{ id: string; action_name: string; result: string; created_at: string }>;
-  activityUnavailable: boolean;
 }
 
 export function validateProfile(value: unknown): EditableProfile {

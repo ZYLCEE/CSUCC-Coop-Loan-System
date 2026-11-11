@@ -1,0 +1,14 @@
+[
+  { "id": "receipt-nov-2", "payment_amount": 1000, "principal_amount": 1000, "interest_amount": 0, "penalty_amount": 0, "fee_amount": 0,
+    "payment_date": "2026-11-10", "created_at": "2026-11-10T09:01:02Z", "payment_method": "cash", "receipt_number": "OR-NOV-002", "payment_status": "posted",
+    "recorded_by": "synthetic-staff", "recorded_by_name": "Test Cashier", "reversal_reason": null, "reversed_at": null, "notes": null },
+  { "id": "receipt-nov-1", "payment_amount": 1600, "principal_amount": 1200, "interest_amount": 400, "penalty_amount": 0, "fee_amount": 0,
+    "payment_date": "2026-11-08", "created_at": "2026-11-10T06:30:45Z", "payment_method": "cash", "receipt_number": "OR-NOV-001", "payment_status": "posted",
+    "recorded_by": "synthetic-staff", "recorded_by_name": "Test Cashier", "reversal_reason": null, "reversed_at": null, "notes": "Backdated receipt for testing" },
+  { "id": "receipt-reversed", "payment_amount": 500, "principal_amount": 500, "interest_amount": 0, "penalty_amount": 0, "fee_amount": 0,
+    "payment_date": "2026-11-05", "created_at": "2026-11-05T02:00:00Z", "payment_method": "cash", "receipt_number": "OR-REVERSED", "payment_status": "reversed",
+    "recorded_by": "synthetic-staff", "recorded_by_name": "Test Cashier", "reversal_reason": "Duplicate receipt", "reversed_at": "2026-11-06T01:00:00Z", "notes": null },
+  { "id": "receipt-oct", "payment_amount": 1000, "principal_amount": 800, "interest_amount": 200, "penalty_amount": 0, "fee_amount": 0,
+    "payment_date": "2026-10-25", "created_at": "2026-10-25T02:15:30Z", "payment_method": "cash", "receipt_number": "OR-OCT-001", "payment_status": "posted",
+    "recorded_by": "synthetic-staff", "recorded_by_name": "Test Cashier", "reversal_reason": null, "reversed_at": null, "notes": null }
+]

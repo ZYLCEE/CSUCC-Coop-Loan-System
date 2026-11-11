@@ -31,7 +31,7 @@ function setup({ role = 'super_admin', status = 'active', privileges = [], passw
     },
   };
   const exports = {};
-  new Function('require', 'exports', 'process', code)(name => name === '@/lib/adminPrivileges' ? privilegesModule : name === '@supabase/supabase-js' ? { createClient: () => client } : require(name), exports, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://project.test', SUPABASE_SERVICE_ROLE_KEY: 'only-a-test-signing-key', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon' } });
+  new Function('require', 'exports', 'process', code)(name => name === "@/lib/portalActivityServer" ? {portalActivityHeaders:()=>({}),portalSessionId:()=>null} : name === '@/lib/adminPrivileges' ? privilegesModule : name === '@supabase/supabase-js' ? { createClient: () => client } : require(name), exports, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://project.test', SUPABASE_SERVICE_ROLE_KEY: 'only-a-test-signing-key', NEXT_PUBLIC_SUPABASE_ANON_KEY: 'test-anon' } });
   const send = body => exports.POST(new Request('http://localhost/api/admin/notifications', { method: 'POST', headers: { Authorization: 'Bearer session', 'Content-Type': 'application/json' }, body: JSON.stringify(body) }));
   const verify = async (body = base) => { const response = await send({ ...body, mode: 'verify', password: 'test-only-password' }); assert.equal(response.status, 200); return (await response.json()).grant; };
   return { ...exports, send, verify, calls, rows, user };

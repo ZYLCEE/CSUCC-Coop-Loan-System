@@ -48,6 +48,16 @@ test("unavailable service and malformed dates/status/category are not presented 
   await assert.rejects(service({ data: null, count: null, error: { code: "42P01" } }).fetchAnnouncements(actor.id, "all"), /could not be loaded/);
   for (const invalid of [{ ...row, status: "unknown" }, { ...row, published_at: null }, { ...row, category: null }]) assert.throws(() => service().parseAnnouncement(invalid), /unsupported record/);
 });
+
+test("announcement page size and chronological order apply before the server range", async () => {
+  const api = service();
+  await api.fetchAnnouncements(actor.id, "all", "", 30, 15, "Oldest");
+  assert.deepEqual(api.calls[0].range, [30, 44]);
+  assert.deepEqual(api.calls[0].orders, [["created_at", {ascending:true}], ["id", {ascending:true}]]);
+  await api.fetchAnnouncements(actor.id, "all", "", 25, 25, "Newest");
+  assert.deepEqual(api.calls[1].range, [25, 49]);
+  assert.deepEqual(api.calls[1].orders, [["created_at", {ascending:false}], ["id", {ascending:false}]]);
+});
 test("categories come from stored definitions and unsupported setup does not invent capabilities", async () => {
   assert.deepEqual(await service({ data: [{ id: "actual-id", name: "Actual category" }], error: null }).fetchAnnouncementCategories(actor.id), [{ id: "actual-id", name: "Actual category" }]);
   await assert.rejects(service({ data: [], error: null }).fetchAnnouncementCategories(actor.id), /unavailable/);

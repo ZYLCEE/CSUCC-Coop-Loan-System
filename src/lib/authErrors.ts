@@ -8,12 +8,13 @@ export function getAuthErrorMessage(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   const normalizedMessage = message.toLowerCase();
 
-  if (normalizedMessage.includes('invalid_credentials') || normalizedMessage.includes('invalid login credential')) {
-    return 'No account found or the password is incorrect.';
-  }
-
-  if (normalizedMessage.includes('email not confirmed')) {
-    return 'Please confirm your email before logging in.';
+  if (
+    normalizedMessage.includes('invalid_credentials') ||
+    normalizedMessage.includes('invalid login credential') ||
+    normalizedMessage.includes('email_not_confirmed') ||
+    normalizedMessage.includes('email not confirmed')
+  ) {
+    return 'Invalid email or password.';
   }
 
   if (normalizedMessage.includes('network') || normalizedMessage.includes('fetch')) {

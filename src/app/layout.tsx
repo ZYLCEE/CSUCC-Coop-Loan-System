@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import { LoginTransitionProvider } from "@/components/auth/LoginTransitionProvider";
 import "./globals.css";
 
 const inter = Inter({
@@ -19,7 +20,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans">{children}</body>
+      {/* Browser extensions such as Monica add body attributes before hydration. */}
+      <body suppressHydrationWarning className="min-h-full flex flex-col font-sans">
+        <LoginTransitionProvider>{children}</LoginTransitionProvider>
+      </body>
     </html>
   );
 }

@@ -34,7 +34,7 @@ export default function FeatureToggles() {
   };
 
   return (
-    <div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
+    <section className="space-y-3"><p role="note" className="text-support text-portal-muted">Legacy preview: these controls are unavailable and do not save changes. Use the current portal settings.</p><fieldset disabled><div className="bg-white rounded-[18px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
       <h2 className="text-[16px] font-bold text-[#1F2937] mb-4">Feature Toggles</h2>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 gap-y-3">
@@ -61,6 +61,6 @@ export default function FeatureToggles() {
           </div>
         ))}
       </div>
-    </div>
+    </div></fieldset></section>
   );
 }

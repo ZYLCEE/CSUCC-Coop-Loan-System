@@ -1,19 +1,41 @@
 "use client";
+import PortalPageHeading from "@/components/shared/PortalPageHeading";
 import RecordActionsMenu from "@/components/shared/RecordActionsMenu";
+import ActiveLoansWorkspace from "@/components/active-loans/ActiveLoansWorkspace";
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { adminRequest } from '@/lib/adminRequest';
 import LoanDetailsModal from '@/components/loan-applications/LoanDetailsModal';
 import CounterPaymentDialog from '@/components/active-loans/CounterPaymentDialog';
 import { useAdminAuth } from '@/components/auth/AdminAuthProvider';
 import { exportCsv } from '@/lib/download';
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { DataTable } from "@/components/ui/DataTable";
+import { DetailDialog } from "@/components/ui/DetailDialog";
+import { EmptyState, LoadingState } from "@/components/ui/Feedback";
+import { Input } from "@/components/ui/Fields";
+import { FilterToolbar, SearchInput } from "@/components/ui/FilterToolbar";
+import { Pagination, PaginationControls } from "@/components/ui/Pagination";
+import { sortRowsByDate, type DateSortOrder } from "@/lib/tablePagination";
+import { StatusBadge } from "@/components/ui/StatusBadge";
 
-export default function RecordsView({ resource, title }: { resource: string; title: string }) {
+const numericColumns = ["amount", "monthly_payment"];
+const columnAlignment = (key: string) =>
+  numericColumns.includes(key) ? "text-right tabular-nums" : key === "status" ? "text-center" : "";
+
+export default function RecordsView(props: { resource: string; title: string }) {
+  return props.resource === "active" ? <ActiveLoansWorkspace /> : <RecordsTable {...props} />;
+}
+
+function RecordsTable({ resource, title }: { resource: string; title: string }) {
   const { role } = useAdminAuth();
   const [paymentLoan, setPaymentLoan] = useState<string | null>(null);
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [query, setQuery] = useState('');
   const [date, setDate] = useState('');
   const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortOrder, setSortOrder] = useState<DateSortOrder>("Newest");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
@@ -23,34 +45,85 @@ export default function RecordsView({ resource, title }: { resource: string; tit
     finally { setLoading(false); }
   }, [resource]);
   useEffect(() => { let active = true; void adminRequest(resource).then(data => { if (active) setRows(data); }).catch(error => { if (active) setError(error.message); }).finally(() => { if (active) setLoading(false); }); return () => { active = false; }; }, [resource]);
-  const filtered = useMemo(() => rows.filter(row => JSON.stringify(row).toLowerCase().includes(query.toLowerCase()) && (!date || String((resource === 'active' ? row.date_submitted : row.created_at) ?? '').startsWith(date))), [rows, query, date, resource]);
+  const filtered = useMemo(() => sortRowsByDate(rows.filter(row => JSON.stringify(row).toLowerCase().includes(query.toLowerCase()) && (!date || String((resource === 'active' ? row.date_submitted : row.created_at) ?? '').startsWith(date))), row => resource === 'active' ? row.date_submitted : row.created_at, sortOrder), [rows, query, date, resource, sortOrder]);
   const columns = resource === 'active'
     ? ['application_id','member_name','loan_type','amount','monthly_payment','status','date_submitted']
     : ['created_at','action_name','target_id','result'];
   const labels: Record<string,string> = {application_id:'Application ID',member_name:'Member',loan_type:'Loan type',amount:'Principal',monthly_payment:'Monthly payment',status:'Status',date_submitted:'Submitted',created_at:'Date & time',action_name:'Action',target_id:'Target',result:'Result'};
   const display = (key: string, value: unknown) => {
     if (value == null) return 'Not recorded';
-    if (['amount','monthly_payment'].includes(key)) return new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(Number(value));
+    if (numericColumns.includes(key)) return new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(Number(value));
     if (['date_submitted','created_at'].includes(key) && Number.isFinite(Date.parse(String(value)))) return new Date(String(value)).toLocaleDateString('en-PH',{month:'short',day:'numeric',year:'numeric',timeZone:'Asia/Manila',...(key==='created_at'?{hour:'numeric',minute:'2-digit'} as const:{})});
     if (typeof value === 'object') return JSON.stringify(value);
     return String(value).replaceAll('_',' ');
   };
-  const button = 'rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green-800 disabled:cursor-not-allowed disabled:opacity-40';
-  const pageSize = resource === 'active' ? 10 : 20;
-  const current = Math.min(page, Math.max(0, Math.ceil(filtered.length / pageSize) - 1));
-  return <section className="min-w-0 overflow-hidden rounded-xl border border-slate-200 bg-white text-slate-900 shadow-sm">
-    <h2 className="border-b border-slate-200 px-5 py-4 text-base font-semibold">{title}</h2>
-    <div className="flex flex-wrap items-center gap-3 px-5 py-4"><input aria-label={`Search ${title}`} placeholder="Search records" value={query} onChange={event => { setQuery(event.target.value); setPage(0); }} className="min-w-0 flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-500 sm:max-w-sm" /><input aria-label="Filter date" type="date" value={date} onChange={event => { setDate(event.target.value); setPage(0); }} className="rounded-lg border border-slate-300 p-2 text-sm text-slate-900" /><button onClick={() => { setQuery(''); setDate(''); setPage(0); }} className={button}>Clear</button><button disabled={loading} onClick={() => void load()} className={button}>Refresh</button><button disabled={loading || !!error || !filtered.length} onClick={() => exportCsv(`${resource}.csv`, filtered)} className={button}>Export CSV</button></div>
-    {error ? <p role="alert" className="text-red-700">{error}</p> : loading ? <p>Loading records…</p> : <><p className="border-y border-slate-200 bg-slate-50 px-5 py-3 text-sm text-slate-600">{filtered.length} records</p><div className="max-w-full overflow-x-auto"><table className="w-full min-w-[960px] text-left text-sm"><thead className="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-600"><tr>{columns.map(key => <th className="whitespace-nowrap border-b border-slate-200 px-5 py-3" key={key}>{labels[key] ?? key.replaceAll('_',' ')}</th>)}<th className="border-b border-slate-200 px-5 py-3">Action</th></tr></thead><tbody>{filtered.slice(current * pageSize, (current + 1) * pageSize).map((row, index) => <tr key={String(row.id ?? index)}>{columns.map(key => <td className="max-w-[240px] whitespace-nowrap border-b border-slate-100 px-5 py-4 text-slate-700" key={key}>{key === 'status' ? <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium capitalize ${row[key] === 'overdue' ? 'border-red-200 bg-red-50 text-red-700' : row[key] === 'released' ? 'border-teal-200 bg-teal-50 text-teal-700' : 'border-green-200 bg-green-50 text-green-800'}`}>{display(key,row[key])}</span> : display(key,row[key])}</td>)}<td className="border-b border-slate-100 px-5 py-4"><div className="flex justify-center">
-      <RecordActionsMenu
-        label={String(row.application_id ?? row.id ?? index)}
-        onView={() => setSelected(row)}
-        onPayment={resource === "active" ? () => setPaymentLoan(String(row.id)) : undefined}
-        canRecordPayment={role === "super_admin" && ["released", "overdue"].includes(String(row.status))}
-      />
-    </div></td></tr>)}</tbody></table></div>{!filtered.length && <p>No matching records.</p>}<div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 text-sm text-slate-600"><button className={button} disabled={current === 0} onClick={() => setPage(current - 1)}>Previous</button><span>Page {current + 1} of {Math.max(1, Math.ceil(filtered.length / pageSize))}</span><button className={button} disabled={(current + 1) * pageSize >= filtered.length} onClick={() => setPage(current + 1)}>Next</button></div></>}
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const current = Math.min(page, totalPages - 1);
+  const start = current * pageSize;
+  const end = Math.min(start + pageSize, filtered.length);
+
+  return <Card padded={false}>
+    {resource==="audit"?<PortalPageHeading section="audit-logs" />:<h2 className="border-b border-portal-border px-4 py-4 text-section-title sm:px-6">{title}</h2>}
+    <FilterToolbar>
+      <SearchInput aria-label={`Search ${title}`} placeholder="Search records" value={query}
+        onChange={event => { setQuery(event.target.value); setPage(0); }} />
+      <Input aria-label="Filter date" type="date" value={date}
+        onChange={event => { setDate(event.target.value); setPage(0); }} />
+      <Button onClick={() => { setQuery(''); setDate(''); setPage(0); }}>Clear</Button>
+      <Button disabled={loading} onClick={() => void load()}>Refresh</Button>
+      <Button disabled={loading || !!error || !filtered.length} onClick={() => exportCsv(`${resource}.csv`, filtered)}>Export CSV</Button>
+    </FilterToolbar>
+    {error ? <p role="alert" className="px-4 pb-4 text-body text-status-danger">{error}</p> : loading ? (
+      <LoadingState label="Loading records…" />
+    ) : <>
+      <DataTable label={`${title} table`} className={resource === "active" ? "min-w-[960px]" : "min-w-[640px]"}>
+        <thead>
+          <tr>
+            {columns.map(key => <th scope="col" className={columnAlignment(key)} key={key}>{labels[key] ?? key.replaceAll('_',' ')}</th>)}
+            <th scope="col" className="text-center">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {filtered.slice(start, end).map((row, index) => (
+            <tr key={String(row.id ?? index)}>
+              {columns.map(key => (
+                <td key={key} className={`max-w-[240px] ${key === "result" ? "break-all" : "whitespace-nowrap"} ${columnAlignment(key)}`}>
+                  {key === "status" ? <StatusBadge status={display(key, row[key])} className="capitalize" /> : display(key, row[key])}
+                </td>
+              ))}
+              <td className="text-center">
+                <RecordActionsMenu
+                  label={String(row.application_id ?? row.id ?? index)}
+                  onView={() => setSelected(row)}
+                  onPayment={resource === "active" ? () => setPaymentLoan(String(row.id)) : undefined}
+                  canRecordPayment={role === "super_admin" && ["released", "overdue"].includes(String(row.status))}
+                />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </DataTable>
+      {!filtered.length && <EmptyState title="No matching records." description="Try changing your search or date filter." />}
+      <Pagination label={`${title} pagination`} currentPage={current + 1} totalPages={totalPages}
+        showingFrom={start + 1} showingTo={end} totalItems={filtered.length} onPageChange={next => setPage(next - 1)}
+        controls={<PaginationControls sortOption={sortOrder} pageSize={pageSize} sortLabel={`Sort ${title}`} pageSizeLabel={`${title} per page`}
+          onSortChange={value => { setSortOrder(value); setPage(0); }} onPageSizeChange={value => { setPageSize(value); setPage(0); }} />} />
+    </>}
     {paymentLoan && <CounterPaymentDialog key={paymentLoan} loanId={paymentLoan} onClose={() => setPaymentLoan(null)} onSaved={() => void load()} />}
     {selected && resource === "active" && <LoanDetailsModal applicationId={String(selected.application_id)} onClose={() => setSelected(null)} />}
-    {selected && resource !== "active" && <div role="dialog" aria-modal="true" aria-label="Record details" className="fixed inset-0 z-[80] flex items-center justify-center bg-black/40 p-4"><div className="max-h-[85vh] w-full max-w-2xl overflow-auto rounded-xl bg-white p-6 text-slate-900 shadow-xl"><button autoFocus onClick={() => setSelected(null)} className="mb-4 rounded border p-2">Close details</button><dl>{Object.entries(selected).map(([key,value]) => <div key={key} className="mb-3"><dt className="text-sm font-semibold">{key.replaceAll('_',' ')}</dt><dd className="break-all text-sm">{typeof value === 'object' ? JSON.stringify(value) : String(value ?? 'Not recorded')}</dd></div>)}</dl></div></div>}
-  </section>;
+    {selected && resource !== "active" && (
+      <DetailDialog title="Record details" titleId="record-details-title" closeLabel="Close details" onClose={() => setSelected(null)}>
+        <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+          {Object.entries(selected).map(([key, value]) => (
+            <div key={key} className="min-w-0">
+              <dt className="text-caption font-medium capitalize text-portal-secondary">{key.replaceAll("_", " ")}</dt>
+              <dd className="mt-0.5 whitespace-pre-wrap text-body [overflow-wrap:anywhere]">
+                {typeof value === "object" ? JSON.stringify(value) : String(value ?? "Not recorded")}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      </DetailDialog>
+    )}
+  </Card>;
 }

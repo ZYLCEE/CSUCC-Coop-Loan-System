@@ -1,4 +1,12 @@
 export const adminPrivileges = [
+  { key: "committee.accounts.manage", label: "Manage committee accounts", description: "Create and manage CRECOM and BOD reviewer accounts after confirming your own password. This does not grant loan approval or privilege assignment." },
+  { key: "applications.finalize", label: "Record final loan decisions", description: "Confirm final approval after all required CRECOM and BOD approvals using your own account password." },
+  { key: "loans.release", label: "Record loan releases", description: "Record an approved loan's actual disbursement after confirming your own account password." },
+  { key: "applications.forward", label: "Manage committee reviews", description: "Forward verified applications, assign eligible reviewers, resolve clarifications and manage reassignment. This does not grant final approval." },
+  { key: "applications.verify", label: "Verify applications", description: "Start application verification, save checks and mark a complete application verified. This does not grant loan approval." },
+  { key: "applications.return", label: "Return application requirements", description: "Request application or file corrections with recorded instructions in the member inbox." },
+  { key: "workflow.policy.manage", label: "Prepare approval policy drafts", description: "Save versioned workflow policy drafts. Activating a production approval policy is not included." },
+  { key: "documents.review", label: "Review member documents", description: "Verify uploaded files or request a replacement with a recorded reason." },
   { key: "documents.upload", label: "Upload documents", description: "Upload cooperative documents to the document library." },
   { key: "documents.delete", label: "Delete documents", description: "Delete cooperative uploads. Loan attachments stay protected." },
   { key: "notifications.send", label: "Send member notifications", description: "Send messages to members after account-password verification." },

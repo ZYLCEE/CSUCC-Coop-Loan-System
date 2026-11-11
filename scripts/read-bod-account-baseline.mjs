@@ -1,0 +1,11 @@
+import {spawnSync} from 'node:child_process';
+import {mkdirSync,writeFileSync} from 'node:fs';
+const cli='C:/Users/zylcee/AppData/Local/npm-cache/_npx/b96a6bd565c470ce/node_modules/@supabase/cli-windows-x64/bin/supabase.exe';
+const names=['committee_bod_enabled','committee_reserve_invite','committee_finish_invite','committee_membership_eligible','committee_complete_setup','committee_change_membership','committee_begin_link','committee_accounts','portal_session_access','committee_assignment_eligible','committee_reviewer_available','committee_account_action'];
+const sql=`SELECT p.proname AS name,pg_get_functiondef(p.oid) AS definition FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace WHERE n.nspname='public' AND p.proname IN (${names.map(n=>`'${n}'`).join(',')}) ORDER BY p.proname;`;
+const result=spawnSync(cli,['db','query','--remote','--read-only',sql,'--output','json'],{encoding:'utf8'});
+if(result.status!==0)throw Error(result.stderr);
+const data=JSON.parse(result.stdout);
+mkdirSync('docs/bod-account-creation',{recursive:true});
+writeFileSync('docs/bod-account-creation/database-baseline.json',JSON.stringify(data.rows,null,2));
+console.log('Saved current definitions: '+data.rows.map(r=>r.name).join(', '));

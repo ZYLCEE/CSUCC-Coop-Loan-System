@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "@/lib/supabase";
 import { getAdminRole } from "@/lib/auth/roles";
+import type { DateSortOrder } from "./tablePagination";
 import { contentLimit, titleLimit, type Announcement, type AnnouncementCategory, type AnnouncementFilter, type AnnouncementStatus } from "@/components/announcements/AnnouncementsData";
 
 const columns = "id,title,content,category_id,status,created_at,updated_at,published_at,scheduled_at,author_name,notify_members,category:announcement_categories(id,name)";
@@ -38,7 +39,7 @@ export function parseAnnouncement(value: unknown): Announcement {
     updatedAt: row.updated_at, publishedAt: row.published_at as string | null,
     scheduledAt: row.scheduled_at as string | null, author: row.author_name as string | null, notifyMembers: row.notify_members };
 }
-export async function fetchAnnouncements(userId: string, filter: AnnouncementFilter, search = "", offset = 0) {
+export async function fetchAnnouncements(userId: string, filter: AnnouncementFilter, search = "", offset = 0, pageSize = announcementPageSize, sortOrder: DateSortOrder = "Newest") {
   const client = await announcementClient(userId);
   let query = client.from("announcements").select(columns, { count: "exact" });
   if (filter !== "all") query = query.eq("status", filter);
@@ -48,7 +49,8 @@ export async function fetchAnnouncements(userId: string, filter: AnnouncementFil
     const pattern = `%${literal}%`.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     query = query.or(`title.ilike."${pattern}",content.ilike."${pattern}"`);
   }
-  const { data, count, error } = await query.order("created_at", { ascending: false }).order("id", { ascending: false }).range(offset, offset + announcementPageSize - 1);
+  const ascending = sortOrder === "Oldest";
+  const { data, count, error } = await query.order("created_at", { ascending }).order("id", { ascending }).range(offset, offset + pageSize - 1);
   if (error || !Array.isArray(data) || count === null || !Number.isSafeInteger(count) || count < 0) {
     throw new Error("Announcements could not be loaded. Check your connection or ask your system administrator to enable the announcements service.");
   }

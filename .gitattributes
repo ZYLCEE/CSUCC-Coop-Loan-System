@@ -1,0 +1,2 @@
+# Preserve whitespace that is part of patch-file context.
+*.patch -whitespace

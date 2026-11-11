@@ -1,8 +1,10 @@
 "use client";
 
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
+import { DetailDialog } from "@/components/ui/DetailDialog";
+import { EmptyState, LoadingState } from "@/components/ui/Feedback";
 import { useEffect, useState } from "react";
-import { X, ExternalLink } from "lucide-react";
+import { ExternalLink, Files } from "lucide-react";
 import { getSupabaseClient } from "@/lib/supabase";
 
 interface DocumentRow {
@@ -13,7 +15,7 @@ interface DocumentRow {
   content_type: string;
   size_bytes: number;
 }
-interface DocumentLink extends DocumentRow { url: string }
+interface DocumentLink extends DocumentRow { url: string; version: number; reviewStatus: string }
 const labels: Record<string, string> = {
   payslip: "Pay Slip", validId: "Valid Identification", collateral: "Collateral Document", supporting: "Other Supporting Documents",
 };
@@ -26,9 +28,18 @@ async function fetchDocuments(applicationId: string): Promise<DocumentLink[]> {
     .order("created_at", { ascending: true }).returns<DocumentRow[]>();
   if (error) throw error;
   return Promise.all(data.map(async (document) => {
-    const { data: link, error: linkError } = await client.storage.from("loan-documents").createSignedUrl(document.storage_path, 300);
+    const latest = await client.from("loan_document_versions").select("id,version,storage_path,original_name,content_type,size_bytes")
+      .eq("document_id",document.id).order("version",{ascending:false}).limit(1).maybeSingle();
+    if(latest.error)throw latest.error;
+    const versionId=latest.data?.id ?? null;
+    let reviewQuery=client.from("loan_document_reviews").select("status").eq("document_id",document.id);
+    reviewQuery=versionId ? reviewQuery.eq("version_id",versionId) : reviewQuery.is("version_id",null);
+    const review=await reviewQuery.order("created_at",{ascending:false}).order("id",{ascending:false}).limit(1).maybeSingle();
+    if(review.error)throw review.error;
+    const file={...document,...latest.data,id:document.id};
+    const { data: link, error: linkError } = await client.storage.from("loan-documents").createSignedUrl(file.storage_path, 300);
     if (linkError) throw linkError;
-    return { ...document, url: link.signedUrl };
+    return { ...file, url: link.signedUrl,version:latest.data?.version ?? 1,reviewStatus:review.data?.status ?? "to_review" };
   }));
 }
 
@@ -48,29 +59,20 @@ export default function LoanDocumentsModal({ applicationId, onClose }: { applica
     });
     return () => { active = false; };
   }, [applicationId, attempt]);
-  useEffect(() => {
-    const handleKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <section role="dialog" aria-modal="true" aria-labelledby="loan-documents-title" onClick={(event) => event.stopPropagation()} className="max-h-[85vh] w-full max-w-xl overflow-y-auto rounded-xl bg-white p-6 shadow-xl">
-        <header className="mb-4 flex items-center justify-between gap-4">
-          <div><h2 id="loan-documents-title" className="text-lg font-bold">Application Documents</h2><p className="text-sm text-slate-500">{applicationId}</p></div>
-          <button type="button" aria-label="Close documents" className={actionButtonStyles()} onClick={onClose}><X className="h-5 w-5" /></button>
-        </header>
-        {loading ? <p role="status">Loading documents...</p> : error ? <p role="alert" className="text-red-700">{error}</p> : documents.length === 0 ? <p className="text-slate-500">No documents are attached to this application.</p> : (
+    <DetailDialog icon={Files} title="Application Documents" titleId="loan-documents-title" subtitle={applicationId} closeLabel="Close documents"
+      className="max-w-xl" overlayClassName="z-[130]" onClose={onClose} dismissOnBackdrop
+      footer={<><button type="button" data-dialog-close className={actionButtonStyles()}>Close</button><button type="button" className={actionButtonStyles()} disabled={loading} onClick={() => { setLoading(true); setError(""); setAttempt((value) => value + 1); }}>Refresh documents</button></>}>
+        {loading ? <LoadingState label="Loading documents…" /> : error ? <p role="alert" className="text-body text-status-danger">{error}</p> : documents.length === 0 ? <EmptyState icon={Files} title="No documents attached" description="This application has no stored attachments." /> : (
           <ul className="space-y-3">{documents.map((document) => (
-            <li key={document.id} className="flex items-center justify-between gap-4 rounded-lg border border-slate-200 p-3">
-              <div className="min-w-0"><p className="font-semibold">{labels[document.kind] ?? document.kind}</p><p className="break-all text-sm text-slate-600">{document.original_name}</p><p className="text-xs text-slate-500">{(document.size_bytes / 1024).toFixed(1)} KB</p></div>
-              <a href={document.url} target="_blank" rel="noopener noreferrer" className={actionButtonStyles()}>Open <ExternalLink className="h-4 w-4" /></a>
+            <li key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-portal-control border border-portal-border p-3">
+              <div className="min-w-0 flex-1"><p className="text-body font-semibold">{labels[document.kind] ?? document.kind}</p><p className="text-support text-portal-muted [overflow-wrap:anywhere]">{document.original_name}</p><p className="text-caption text-portal-secondary">{(document.size_bytes / 1024).toFixed(1)} KB · Version {document.version} · {document.reviewStatus==="verified" ? "Verified" : document.reviewStatus==="needs_replacement" ? "Needs replacement" : "To review"}</p></div>
+              <a href={document.url} target="_blank" rel="noopener noreferrer" className={actionButtonStyles()}>Open <ExternalLink className="size-icon-compact" aria-hidden="true" /></a>
             </li>
           ))}</ul>
         )}
-        <p className="mt-4 text-xs text-slate-500">Document links expire after 5 minutes.</p>
-        <button type="button" className={`mt-3 ${actionButtonStyles()}`} disabled={loading} onClick={() => { setLoading(true); setError(""); setAttempt((value) => value + 1); }}>Refresh documents</button>
-      </section>
-    </div>
+        {documents.length > 0 && !loading && !error && <p className="mt-4 text-caption text-portal-secondary">Document links expire after 5 minutes.</p>}
+
+    </DetailDialog>
   );
 }

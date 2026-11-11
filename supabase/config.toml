@@ -15,4 +15,7 @@ port = 54323
 verify_jwt = false
 
 [functions.list-admin-accounts]
-verify_jwt = false
+verify_jwt = true
+
+[auth.email.smtp]
+sender_name = "CSUCC MPC"

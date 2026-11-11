@@ -1,0 +1,45 @@
+{
+  "baseCommit": "5aa01d87e4f32e2f4eb4d33c66c4d5377f16f053",
+  "files": [
+    {
+      "path": "lib/models/loan_consent_submission.dart",
+      "sha256": "3e9fd5c9888978f9b32afe2b924c2c71763805a8a5b08243a301b4bc976a4554"
+    },
+    {
+      "path": "lib/review_terms_screen.dart",
+      "sha256": "a356081a067eda98897da0d54fff5486dc51596dffaefea9db009b61374f5d0e"
+    },
+    {
+      "path": "lib/co_maker_invitation_screen.dart",
+      "sha256": "5d107230f42aa78e42c5e7344dd19e941334fb0e3d3990d3f3d38fbe3e13ae81"
+    },
+    {
+      "path": "lib/email_otp_verification_screen.dart",
+      "sha256": "19c1f44de9294cb81bb64f3813269a682be2e93fd39a88ab0427c74d9b60cd76"
+    },
+    {
+      "path": "lib/services/database_service.dart",
+      "sha256": "8920e6f0916a3ec0d5b3335818bbbf589fe6a32dd8a98ce2a19b8b8b61b2c806"
+    },
+    {
+      "path": "lib/services/loan_document_upload_service.dart",
+      "sha256": "30cf7899d3dba67ef3d1fa790146ee1b84395ba25a7349fc252eead97002c271"
+    },
+    {
+      "path": "test/loan_consent_submission_test.dart",
+      "sha256": "b7bcc799786c119cb21b2049a1c4b388abe09c89a50230b0845a2027a4d2bd1d"
+    },
+    {
+      "path": "supabase/migrations/20261112030000_loan_submission_agreements.sql",
+      "sha256": "90165a3d7bb27c615a75671a2b22386f0cc86d6d30bedfcc50ea32bc354c9897"
+    },
+    {
+      "path": "CONSENT-INTEGRATION.md",
+      "sha256": "6823e4fae99abd2b1624286110df6cf6c3d406cecb6705d5c21c07ffe905dd3f"
+    },
+    {
+      "path": "test/loan_consent_terms_contract_test.dart",
+      "sha256": "6c8af7b383687ddd2ccc4159540d9c81f61eb50ef4d7dd18e0df86c67490a543"
+    }
+  ]
+}

@@ -28,4 +28,5 @@ export const normalizedMemberRoles = new Set<MemberRole>(["Member", "Admin", "Su
 export const statusFilterOptions: MemberStatusFilter[] = ["All Status", "Active", "Inactive", "Blocked", "Suspended", "Unknown"];
 export const memberSortOptions: MemberSortOption[] = ["Name A-Z", "Name Z-A", "Newest", "Oldest"];
 export const memberRoles: MemberRole[] = ["Member", "Admin"];
+export const creatableMemberRoles: MemberRole[] = [...memberRoles, "Super Admin"];
 export const memberStatuses: MemberStatus[] = ["Active", "Inactive", "Blocked", "Suspended"];

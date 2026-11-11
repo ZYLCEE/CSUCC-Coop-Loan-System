@@ -35,7 +35,7 @@ function setup({ role = 'super_admin', status = 'active', member = null, memberE
     signOut: async options => { calls.push({ temporarySignOut: options }); return { error: null }; },
   } };
   const exports = {};
-  new Function('require', 'exports', 'process', code)(name => name === '@/lib/adminPrivileges' ? privilegesModule : name === '@/lib/profileModel' ? profileModule : {
+  new Function('require', 'exports', 'process', code)(name => name === "@/lib/portalActivityServer" ? {portalActivityHeaders:()=>({}),portalSessionId:()=>null} : name === '@/lib/adminPrivileges' ? privilegesModule : name === '@/lib/profileModel' ? profileModule : {
     createClient: (_url, key) => key === 'test-service-key' ? client : verifier,
   }, exports, { env: { NEXT_PUBLIC_SUPABASE_URL: 'https://project.test', SUPABASE_SERVICE_ROLE_KEY: 'test-service-key', NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: 'test-public-key' } });
   const request = (method = 'GET', body) => new Request('http://localhost/api/admin/profile', { method, headers: { Authorization: 'Bearer test', 'Content-Type': 'application/json' }, ...(body ? { body: JSON.stringify(body) } : {}) });
@@ -48,7 +48,8 @@ test('both admin roles can load their profile without a linked member record', a
     assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
     assert.equal(data.profile.first_name, 'Existing'); assert.equal(data.memberLinked, false);
     assert.equal(data.account.id, 'self'); assert.equal('app_metadata' in data.account, false);
-    assert.deepEqual(f.calls.find(call => call.activity).filters, [['actor_id', 'self']]);
+    assert.equal(f.calls.some(call => call.activity), false);
+    assert.equal('activity' in data, false);
   }
 });
 test('missing, member and inactive sessions cannot read or change admin profiles', async () => {
@@ -99,9 +100,10 @@ test('wrong passwords, another verified identity, mismatches and Auth failures n
   }
   const f = setup(); assert.equal((await f.POST(f.request('POST', { ...passwords, confirm: 'wrong' }))).status, 400); assert.equal(f.calls.length, 0);
 });
-test('activity failures do not prevent loading profiles or hide successful updates', async () => {
+test('profiles load without activity history and successful writes still report logging failures', async () => {
   const f = setup({ auditError: { message: 'unavailable' } }); const response = await f.GET(f.request());
-  assert.equal(response.status, 200); assert.equal((await response.json()).activityUnavailable, true);
+  assert.equal(response.status, 200); assert.equal('activity' in await response.json(), false);
+  assert.equal(f.calls.some(call => call.activity), false);
   assert.match((await (await f.PUT(f.request('PUT', profile))).json()).warning, /activity log/);
   assert.match((await (await f.POST(f.request('POST', passwords))).json()).warning, /activity log/);
 });

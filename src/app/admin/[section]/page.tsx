@@ -11,6 +11,7 @@ import ReportsPage from "@/app/(admin)/reports/page";
 import AuditLogsPage from "@/app/(admin)/audit-logs/page";
 import SettingsPage from "@/app/(admin)/settings/page";
 import ProfilePage from "@/app/(admin)/profile/page";
+import CommitteeAccounts from "@/components/committee/CommitteeAccounts";
 import AdminReadOnlySection from "@/components/shared/AdminReadOnlySection";
 
 const pages: Record<string, ComponentType> = {
@@ -26,8 +27,10 @@ const pages: Record<string, ComponentType> = {
   documents: DocumentsPage,
   reports: ReportsPage,
   "audit-logs": AuditLogsPage,
+  "active-logs": AuditLogsPage,
   settings: SettingsPage,
   profile: ProfilePage,
+  "committee-accounts":CommitteeAccounts,
 };
 
 export default async function AdminSectionPage({

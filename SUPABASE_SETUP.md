@@ -36,6 +36,10 @@ Both the Flutter app and admin web connect to the same Supabase database:
 - **Flutter app** uses the anon key with member-scoped RLS policies.
 - **Admin web** uses the same project with an authenticated admin session.
 
+### Auth Email Sender
+
+Supabase Auth sends verification and account emails using the project's SMTP settings. For a hosted project, open **Authentication → Email → SMTP Settings** in the Supabase Dashboard and set **Sender name** to `CSUCC MPC`. Set **Sender email address** to an address verified with your SMTP provider; changing the display name does not change the sender email address. The local Supabase configuration also sets the sender name to `CSUCC MPC`.
+
 ## Real-time Updates
 
 The loan applications page refreshes on changes to `loan_applications`, and the Super Admin portal displays alerts for new pending applications. These features require `loan_applications` in the project's Supabase Realtime publication and read access for the signed-in administrator.

@@ -1,12 +1,21 @@
 "use client";
+import PortalPageHeading from "@/components/shared/PortalPageHeading";
 
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import MemberToolbar from "@/components/members/MemberToolbar";
+import { Ban, KeyRound, Trash2, Unlock, UserRoundPen, UserRoundPlus } from "lucide-react";
+import MemberToolbar, { MemberPaginationControls } from "@/components/members/MemberToolbar";
 import MembersTable from "@/components/members/MembersTable";
+import { Card } from "@/components/ui/Card";
+import { LoadingState } from "@/components/ui/Feedback";
+import { Pagination } from "@/components/ui/Pagination";
 import MemberDetailsModal from "@/components/members/MemberDetailsModal";
 import MemberFormModal from "@/components/members/MemberFormModal";
+import ResetPasswordModal from "@/components/members/ResetPasswordModal";
+import AccountPrivilegesDialog from "@/components/members/AccountPrivilegesDialog";
+import AccountActionReasonDialog from "@/components/members/AccountActionReasonDialog";
+import type { ReasonedAccountAction } from "@/lib/accountActionReasons";
 import {
   Member,
   MemberRoleFilter,
@@ -16,20 +25,18 @@ import {
 import {
   MembershipTypeFilter,
   getMembershipTypeLabel,
+  normalizeMembershipMemberId,
 } from "@/lib/membership";
 import { AdminAccountLoadError, fetchAdminAccounts } from "@/lib/adminAccounts";
 import { useSecureAdminAction } from "@/components/auth/SecureAdminActionProvider";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 
-interface AppliedFilters {
+interface MemberFilters {
   search: string;
-  memberId: string;
   role: MemberRoleFilter;
   status: MemberStatusFilter;
   membershipType: MembershipTypeFilter;
 }
-
-const normalizeFilterValue = (value: string) => value.trim().toLowerCase();
 
 export default function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
@@ -37,11 +44,8 @@ export default function MembersPage() {
   const [membersError, setMembersError] = useState("");
   const [sessionExpired, setSessionExpired] = useState(false);
   const [dataIntegrityIssues, setDataIntegrityIssues] = useState(0);
-  const [searchInput, setSearchInput] = useState("");
-  const [memberIdInput, setMemberIdInput] = useState("");
-  const [filters, setFilters] = useState<AppliedFilters>({
+  const [filters, setFilters] = useState<MemberFilters>({
     search: "",
-    memberId: "",
     role: "All Roles",
     status: "All Status",
     membershipType: "All Members",
@@ -50,6 +54,15 @@ export default function MembersPage() {
   const [sortOption, setSortOption] = useState<MemberSortOption>("Newest");
   const [currentPage, setCurrentPage] = useState(1);
   const [viewedMember, setViewedMember] = useState<Member | null>(null);
+  const [resetMember, setResetMember] = useState<Member | null>(null);
+  const [privilegeMember, setPrivilegeMember] = useState<Member | null>(null);
+  const [resetBusy, setResetBusy] = useState(false);
+  const resetting = useRef(false);
+  const [accountDecision, setAccountDecision] = useState<{ member: Member; action: ReasonedAccountAction } | null>(null);
+  const [decisionBusy, setDecisionBusy] = useState(false);
+  const deciding = useRef(false);
+  const [formBusy, setFormBusy] = useState(false);
+  const saving = useRef(false);
   const [memberForm, setMemberForm] = useState<{
     mode: "add" | "edit";
     member: Member | null;
@@ -117,21 +130,21 @@ export default function MembersPage() {
   }, []);
 
   const filteredMembers = useMemo(() => {
-    const search = normalizeFilterValue(filters.search);
-    const memberId = normalizeFilterValue(filters.memberId);
+    const search = filters.search.trim().toLowerCase();
+    const memberIdSearch = normalizeMembershipMemberId(search);
 
     return members.filter((member) => {
       const searchableText = [
         member.fullName,
         member.email,
         member.department,
+        member.idNumber,
       ]
         .join(" ")
         .toLowerCase();
 
-      const matchesSearch = search === "" || searchableText.includes(search);
-      const matchesMemberId =
-        memberId === "" || member.idNumber.toLowerCase().includes(memberId);
+      const matchesSearch = searchableText.includes(search) ||
+        (memberIdSearch !== "" && normalizeMembershipMemberId(member.idNumber).includes(memberIdSearch));
       const matchesRole =
         filters.role === "All Roles" || member.role === filters.role;
       const matchesStatus =
@@ -143,7 +156,6 @@ export default function MembersPage() {
 
       return (
         matchesSearch &&
-        matchesMemberId &&
         matchesRole &&
         matchesStatus &&
         matchesMembershipType
@@ -181,34 +193,8 @@ export default function MembersPage() {
   );
   const showingFrom = sortedMembers.length === 0 ? 0 : pageStartIndex + 1;
   const showingTo = Math.min(pageStartIndex + pageSize, sortedMembers.length);
-  const showClearButton =
-    filters.search.trim() !== "" ||
-    filters.memberId.trim() !== "" ||
-    filters.role !== "All Roles" ||
-    filters.status !== "All Status" ||
-    filters.membershipType !== "All Members";
-
-  const applyTextFilters = () => {
-    setFilters((current) => ({
-      ...current,
-      search: searchInput,
-      memberId: memberIdInput,
-    }));
-    setCurrentPage(1);
-  };
-
-  const updateRoleFilter = (role: MemberRoleFilter) => {
-    setFilters((current) => ({ ...current, role }));
-    setCurrentPage(1);
-  };
-
-  const updateStatusFilter = (status: MemberStatusFilter) => {
-    setFilters((current) => ({ ...current, status }));
-    setCurrentPage(1);
-  };
-
-  const updateMembershipTypeFilter = (membershipType: MembershipTypeFilter) => {
-    setFilters((current) => ({ ...current, membershipType }));
+  const updateFilters = (changes: Partial<MemberFilters>) => {
+    setFilters((current) => ({ ...current, ...changes }));
     setCurrentPage(1);
   };
 
@@ -222,26 +208,18 @@ export default function MembersPage() {
     setCurrentPage(1);
   };
 
-  const clearMemberControls = () => {
-    setSearchInput("");
-    setMemberIdInput("");
-    setFilters({
-      search: "",
-      memberId: "",
-      role: "All Roles",
-      status: "All Status",
-      membershipType: "All Members",
-    });
-    setSortOption("Newest");
-    setCurrentPage(1);
-  };
-
   const toggleMemberBlockStatus = (member: Member) => {
+    if (readOnly) return;
     const isBlocked = member.status === "Blocked";
+    if (!isBlocked) { setAccountDecision({ member, action: "block-account" }); return; }
     beginSecureAction({
       action: isBlocked ? "unblock-account" : "block-account",
       target: member.idNumber,
       title: isBlocked ? "Unblock Account" : "Block Account",
+      icon: Unlock,
+      securityTitle: "Verify Account Unblock",
+      securityDescription: "Enter your Super Admin password to continue unblocking this account.",
+      securityDetails: [{ label: "Account", value: member.fullName }, { label: "ID Number", value: member.idNumber }],
       question: `Are you sure you want to ${isBlocked ? "unblock" : "block"} ${member.fullName}'s account?`,
       confirmLabel: isBlocked ? "Unblock Account" : "Block Account",
       successMessage: `Account ${isBlocked ? "unblocked" : "blocked"} successfully.`,
@@ -257,26 +235,65 @@ export default function MembersPage() {
   };
 
   const deleteMember = (member: Member) => {
+    if (!readOnly) setAccountDecision({ member, action: "delete-account" });
+  };
+
+  const submitAccountDecision = (reason: string) => {
+    if (!accountDecision || readOnly || deciding.current) return;
+    const { member, action } = accountDecision;
+    const deleting = action === "delete-account";
+    deciding.current = true; setDecisionBusy(true);
+    const unlock = () => { deciding.current = false; setDecisionBusy(false); };
     beginSecureAction({
-      action: "delete-account",
+      action,
       target: member.idNumber,
-      title: "Delete Account",
-      question: `Are you sure you want to permanently delete ${member.fullName}'s account?`,
-      confirmLabel: "Delete Account",
-      successMessage: "Account deleted successfully.",
-      payload: {},
+      title: deleting ? "Delete Account" : "Block Account",
+      icon: deleting ? Trash2 : Ban,
+      securityTitle: deleting ? "Verify Account Deletion" : "Verify Account Block",
+      securityDescription: `Enter your Super Admin password to continue ${deleting ? "deleting" : "blocking"} this account.`,
+      securityDetails: [{ label: "Account", value: member.fullName }, { label: "ID Number", value: member.idNumber }],
+      question: deleting ? `Permanently delete ${member.fullName}'s sign-in account?` : `Block ${member.fullName}'s account? They will no longer be able to access the system.`,
+      confirmLabel: deleting ? "Delete Account" : "Block Account",
+      successMessage: deleting ? "Account deleted successfully." : "Account blocked successfully.",
+      payload: { reason },
       details: [
         { label: "Full Name", value: member.fullName },
         { label: "ID Number", value: member.idNumber },
+        { label: "Reason", value: reason },
       ],
+      onCancel: unlock,
+      onFailure: unlock,
       onSuccess: () => {
-        setCurrentPage(1);
+        unlock(); setAccountDecision(null);
+        if (deleting) setCurrentPage(1);
         refreshMembers();
       },
     });
   };
 
+  const resetPassword = (temporaryPassword: string) => {
+    if (!resetMember || readOnly || resetting.current) return;
+    resetting.current = true; setResetBusy(true);
+    const unlock = () => { resetting.current = false; setResetBusy(false); };
+    beginSecureAction({
+      action: "reset-account-password", target: resetMember.idNumber,
+      title: "Reset Account Password", question: `Reset the password for ${resetMember.fullName}? They must change the temporary password on their next sign-in.`,
+      icon: KeyRound,
+      securityTitle: "Verify Password Reset",
+      securityDescription: "Enter your Super Admin password to continue resetting this account’s password.",
+      securityDetails: [{ label: "Account", value: resetMember.fullName }, { label: "ID Number", value: resetMember.idNumber }],
+      confirmLabel: "Reset Password", successMessage: "Account password reset successfully.",
+      payload: {}, secret: { temporaryPassword },
+      details: [{ label: "Account", value: resetMember.fullName }, { label: "ID Number", value: resetMember.idNumber }, { label: "Role", value: resetMember.role }],
+      onCancel: unlock, onFailure: unlock,
+      onSuccess: () => { unlock(); setResetMember(null); refreshMembers(); },
+    });
+  };
+
   const saveMember = (member: Member, temporaryPassword?: string) => {
+    if (readOnly || saving.current) return;
+    saving.current = true; setFormBusy(true);
+    const unlock = () => { saving.current = false; setFormBusy(false); };
     const isEdit = memberForm?.mode === "edit" && Boolean(memberForm.member);
     const action = isEdit ? "edit-account" : "create-account";
     const target = isEdit
@@ -298,9 +315,13 @@ export default function MembersPage() {
       action,
       target,
       title: isEdit ? "Save Account Changes" : "Create Account",
+      icon: isEdit ? UserRoundPen : UserRoundPlus,
+      securityTitle: isEdit ? "Verify Account Changes" : "Verify Account Creation",
+      securityDescription: `Enter your Super Admin password to continue ${isEdit ? "saving these account changes" : "creating this account"}.`,
+      securityDetails: [{ label: "Account", value: member.fullName }, ...(isEdit ? [{ label: "ID Number", value: member.idNumber }] : []), { label: "Role", value: member.role }],
       question: isEdit
         ? `Are you sure you want to save changes to ${member.fullName}'s account?`
-        : `Are you sure you want to create this account for ${member.fullName}?`,
+        : `Are you sure you want to create a ${member.role} account for ${member.fullName}?`,
       confirmLabel: isEdit ? "Save Changes" : "Create Account",
       successMessage: isEdit
         ? "Account updated successfully."
@@ -325,7 +346,10 @@ export default function MembersPage() {
             ]
           : []),
       ],
+      onCancel: unlock,
+      onFailure: unlock,
       onSuccess: () => {
+        unlock();
         setMemberForm(null);
         setCurrentPage(1);
         refreshMembers();
@@ -335,31 +359,23 @@ export default function MembersPage() {
 
   return (
     <>
-      <div className="overflow-hidden rounded-[8px] border border-[#E1E7EF] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.08)]">
+      <Card padded={false} className="overflow-hidden">
+        <PortalPageHeading section="all-accounts" />
         <MemberToolbar
-          searchValue={searchInput}
-          memberIdValue={memberIdInput}
+          searchValue={filters.search}
           roleFilter={filters.role}
           statusFilter={filters.status}
           membershipTypeFilter={filters.membershipType}
-          sortOption={sortOption}
-          pageSize={pageSize}
-          showClear={showClearButton}
           readOnly={readOnly}
-          onSearchChange={setSearchInput}
-          onMemberIdChange={setMemberIdInput}
-          onApplyFilters={applyTextFilters}
-          onClearFilters={clearMemberControls}
-          onRoleFilterChange={updateRoleFilter}
-          onStatusFilterChange={updateStatusFilter}
-          onMembershipTypeFilterChange={updateMembershipTypeFilter}
-          onSortChange={updateSortOption}
-          onPageSizeChange={updatePageSize}
+          onSearchChange={(search) => updateFilters({ search })}
+          onRoleFilterChange={(role) => updateFilters({ role })}
+          onStatusFilterChange={(status) => updateFilters({ status })}
+          onMembershipTypeFilterChange={(membershipType) => updateFilters({ membershipType })}
           onAddMember={() => setMemberForm({ mode: "add", member: null })}
         />
 
         {membersError ? (
-          <div role="alert" className="border-t border-[#E5E7EB] px-4 py-8 text-center text-sm font-medium text-[#B91C1C]">
+          <div role="alert" className="border-t border-portal-border px-4 py-8 text-center text-sm font-medium text-status-danger">
             {membersError}
             {sessionExpired && <Link href="/login" className={`ml-2 ${actionButtonStyles()}`}>Sign in again</Link>}
             <button
@@ -371,9 +387,7 @@ export default function MembersPage() {
             </button>
           </div>
         ) : membersLoading ? (
-          <div className="border-t border-[#E5E7EB] px-4 py-10 text-center text-sm font-medium text-[#64748B]">
-            Loading accounts...
-          </div>
+          <LoadingState label="Loading accounts..." />
         ) : (
           <>
             {dataIntegrityIssues > 0 && (
@@ -389,32 +403,50 @@ export default function MembersPage() {
             )}
             <MembersTable
               members={paginatedMembers}
-              currentPage={activePage}
-              totalPages={totalPages}
-              totalItems={sortedMembers.length}
-              showingFrom={showingFrom}
-              showingTo={showingTo}
               readOnly={readOnly}
-              onPageChange={setCurrentPage}
               onViewMember={setViewedMember}
               onEditMember={(member) => setMemberForm({ mode: "edit", member })}
               onToggleBlockStatus={toggleMemberBlockStatus}
               onDeleteMember={deleteMember}
+              onResetPassword={setResetMember}
+              onManagePrivileges={setPrivilegeMember}
+            />
+            <Pagination
+              currentPage={activePage}
+              totalPages={totalPages}
+              totalItems={sortedMembers.length}
+              itemLabel="accounts"
+              showingFrom={showingFrom}
+              showingTo={showingTo}
+              onPageChange={setCurrentPage}
+              showStepButtons
+              controls={
+                <MemberPaginationControls
+                  sortOption={sortOption}
+                  pageSize={pageSize}
+                  onSortChange={updateSortOption}
+                  onPageSizeChange={updatePageSize}
+                />
+              }
             />
           </>
         )}
-      </div>
+      </Card>
 
       <MemberDetailsModal
         member={viewedMember}
         onClose={() => setViewedMember(null)}
       />
+      {resetMember && <ResetPasswordModal key={resetMember.accountKey ?? resetMember.idNumber} member={resetMember} busy={resetBusy} onClose={() => setResetMember(null)} onSubmit={resetPassword} />}
+      {privilegeMember && <AccountPrivilegesDialog key={privilegeMember.accountKey ?? privilegeMember.idNumber} member={privilegeMember} onClose={() => setPrivilegeMember(null)} />}
+      {accountDecision && <AccountActionReasonDialog key={`${accountDecision.action}-${accountDecision.member.accountKey ?? accountDecision.member.idNumber}`} member={accountDecision.member} action={accountDecision.action} busy={decisionBusy} onClose={() => setAccountDecision(null)} onContinue={submitAccountDecision} />}
 
       {memberForm && (
         <MemberFormModal
           key={`${memberForm.mode}-${memberForm.member?.idNumber ?? "new"}`}
           mode={memberForm.mode}
           member={memberForm.member}
+          busy={formBusy}
           onClose={() => setMemberForm(null)}
           onSubmit={saveMember}
         />

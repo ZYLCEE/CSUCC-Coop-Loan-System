@@ -1,3 +1,4 @@
+import {portalActivityHeaders} from "@/lib/portalActivityServer";
 import { createClient, type User } from "@supabase/supabase-js";
 import { isActiveAdministrator } from "@/lib/adminPrivileges";
 import { emailChangeFailure, validateEmailChange, validatePasswordChange, validateProfile } from "@/lib/profileModel";
@@ -15,7 +16,7 @@ async function handle(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return fail("Server-side profile configuration is missing.", 503);
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const client = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:portalActivityHeaders(request)}});
     const token = request.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
     if (!token) return fail("Sign in to manage your profile.", 401);
     const { data: { user }, error } = await client.auth.getUser(token);
@@ -75,11 +76,10 @@ async function handle(request: Request) {
     if (request.method === "GET") {
       const member = linked.data;
       const metadata = user.user_metadata;
-      const activity = await client.from("admin_activity_logs").select("id,action_name,result,created_at").eq("actor_id", user.id).order("created_at", { ascending: false }).order("id", { ascending: false }).limit(10);
       return reply({ profile: {
         first_name: text(member?.first_name ?? metadata.first_name), last_name: text(member?.last_name ?? metadata.last_name),
         phone: text(member?.phone ?? metadata.phone), department: text(member?.department ?? metadata.department), position: text(metadata.position),
-      }, account: accountInfo(user), memberLinked: !!member, activity: activity.error ? [] : activity.data, activityUnavailable: !!activity.error });
+      }, account: accountInfo(user), memberLinked: !!member });
     }
 
     const raw = await request.text();

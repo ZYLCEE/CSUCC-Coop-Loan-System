@@ -10,11 +10,11 @@ export default function GeneralSettings() {
   const [passwordMinLength, setPasswordMinLength] = useState("8");
 
   const handleSaveSettings = () => {
-    console.log("Saving system settings");
+    // Legacy preview has no settings API.
   };
 
   return (
-    <div className="bg-white rounded-[14px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
+    <section className="space-y-3"><p role="note" className="text-support text-portal-muted">Legacy preview: these controls are unavailable and do not save changes. Use the current portal settings.</p><fieldset disabled><div className="bg-white rounded-[14px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
       <h2 className="text-[16px] font-bold text-[#111827] mb-4">System Configuration</h2>
 
       <div className="space-y-3">
@@ -85,6 +85,6 @@ export default function GeneralSettings() {
       >
         Save Settings
       </button>
-    </div>
+    </div></fieldset></section>
   );
 }

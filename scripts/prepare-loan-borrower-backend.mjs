@@ -1,0 +1,18 @@
+import assert from "node:assert/strict";
+import {readFileSync,writeFileSync,mkdirSync} from "node:fs";
+import {createHash} from "node:crypto";
+const basePath="docs/member-account-flow/deployed-source/supabase/edge-functions/secure-admin-action/index.ts.txt";
+const source=readFileSync(basePath,"utf8");
+const digest=value=>createHash("sha256").update(value).digest("hex");
+assert.equal(digest(source),"983fd1825e0194595a0691c352c1703857fb47e0371b6ef1db0d8a98e0712a4e","Use the previously verified hosted version-10 source.");
+const oldJoin="members!inner(status,date_joined)",newJoin="members:members!loan_applications_member_id_fkey!inner(status,date_joined)";
+assert.equal(source.split(oldJoin).length,2);
+const proposed=source.replace(oldJoin,newJoin);
+assert.equal(proposed.replace(newJoin,oldJoin),source,"The borrower join must be the only source change.");
+const root="node_modules/.cache/coop-loan-borrower-deploy/supabase";
+mkdirSync(root+"/edge-functions/secure-admin-action",{recursive:true});
+mkdirSync(root+"/functions/secure-admin-action",{recursive:true});
+writeFileSync(root+"/edge-functions/secure-admin-action/index.ts",proposed);
+writeFileSync(root+"/functions/secure-admin-action/index.ts",readFileSync("docs/member-account-flow/deployed-source/supabase/functions/secure-admin-action/index.ts.txt"));
+writeFileSync(root+"/config.toml","project_id = 'jhgsqvxlvwhrwpcekvpq'\n[functions.secure-admin-action]\nverify_jwt = true\n");
+console.log(JSON.stringify({baselineVersion:10,baselineSha256:digest(source),proposedSha256:digest(proposed),onlyChange:"explicit borrower relationship in approval lookup",verifyJwt:true}));

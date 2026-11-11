@@ -8,8 +8,13 @@ import {
   useRef,
   useState,
 } from "react";
-import { Eye, EyeOff, LoaderCircle, ShieldCheck, X } from "lucide-react";
+import { Eye, EyeOff, FileCheck2, ShieldCheck, XCircle, type LucideIcon } from "lucide-react";
 import { invokeProtectedAction } from "@/lib/protectedAction";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Fields";
+import { ActionDialog } from "@/components/ui/ActionDialog";
+import { ActionSummary, ConfirmActionDialog } from "@/components/ui/ConfirmActionDialog";
+import { ActionResultDialog } from "@/components/ui/ActionResultDialog";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 
 export interface SecureActionRequest {
@@ -19,6 +24,11 @@ export interface SecureActionRequest {
   question: string;
   confirmLabel: string;
   successMessage: string;
+  successTitle?: string;
+  securityTitle?: string;
+  securityDescription?: string;
+  securityDetails?: Array<{ label: string; value: string }>;
+  icon?: LucideIcon;
   payload: Record<string, unknown>;
   secret?: Record<string, unknown>;
   details?: Array<{ label: string; value: string }>;
@@ -56,6 +66,7 @@ export function SecureAdminActionProvider({
   } | null>(null);
   const [error, setError] = useState("");
   const busyRef = useRef(false);
+  const actionTrigger = useRef<HTMLElement | null>(null);
 
   const beginSecureAction = (nextRequest: SecureActionRequest) => {
     if (!enabled || (role !== "super_admin" && !(nextRequest.action === "send-notification" && can("notifications.send")))) {
@@ -64,6 +75,7 @@ export function SecureAdminActionProvider({
     if (busyRef.current || request) {
       return;
     }
+    actionTrigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     setRequest(nextRequest);
     setStage("security");
     setGrant(null);
@@ -211,10 +223,7 @@ export function SecureAdminActionProvider({
         request.onSuccess?.(actionResult);
         setResult({
           success: true,
-          message:
-            typeof actionResult.message === "string"
-              ? actionResult.message
-              : request.successMessage,
+          message:(typeof actionResult.message === "string"?actionResult.message:request.successMessage)+(typeof data.warning==="string"?" "+data.warning:""),
         });
       }
       setSecurityPassword("");
@@ -242,166 +251,47 @@ export function SecureAdminActionProvider({
     }
   };
 
+  const visible = enabled && !!request && (role === "super_admin" || (request.action === "send-notification" && can("notifications.send")));
+  const passwordInput = useRef<HTMLInputElement>(null);
+  const tone = request?.action === "delete-account" || request?.action === "block-account" || request?.action === "reject-loan" ? "destructive" : "primary";
+
   return (
     <SecureAdminActionContext.Provider value={{ beginSecureAction }}>
       {children}
-      {enabled && request && (role === "super_admin" || (request.action === "send-notification" && can("notifications.send"))) && (
-        <div
-          className="fixed inset-0 z-[110] flex items-center justify-center bg-[#111827]/50 p-4"
-          role="presentation"
-        >
-          <section
-            className="w-full max-w-[440px] rounded-[14px] border border-[#E5E7EB] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="secure-action-title"
-          >
-            <header className="flex items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
-              <div className="flex items-center gap-2.5">
-                <ShieldCheck className="h-5 w-5 text-[#155D3B]" aria-hidden="true" />
-                <h2
-                  id="secure-action-title"
-                  className="text-[17px] font-bold text-[#1F2937]"
-                >
-                  {stage === "security"
-                    ? `Verify to ${request.action.replaceAll("-", " ")}`
-                    : stage === "confirmation"
-                      ? request.title
-                      : result?.success
-                        ? "Success"
-                        : "Action Failed"}
-                </h2>
-              </div>
-              {!busy && stage !== "result" && (
-                <button
-                  type="button"
-                  onClick={cancel}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] hover:bg-[#F1F5F9]"
-                  aria-label="Cancel action"
-                >
-                  <X className="h-4 w-4" />
+      {visible && request && stage === "security" && (
+        <ActionDialog title={request.securityTitle ?? `Verify to ${request.action.replaceAll("-", " ")}`} subtitle={request.securityTitle ? request.title : undefined} icon={ShieldCheck}
+          className="max-w-[480px]" busy={busy} onClose={cancel} closeLabel="Cancel action" returnFocusRef={actionTrigger}
+          footer={<><Button disabled={busy} onClick={cancel}>Cancel</Button>
+            <Button variant="primary" loading={busy} type="submit" form="secure-action-password" disabled={!securityPassword}>Verify password</Button></>}>
+          <form id="secure-action-password" onSubmit={verifyIdentity} className="space-y-4">
+            <p className="text-support text-portal-muted">{request.securityDescription ?? "Enter your account password to confirm this action."}</p>
+            {!!request.securityDetails?.length && <ActionSummary details={request.securityDetails} />}
+            <label className="block space-y-1.5">
+              <span className="text-label">{request.securityTitle ? "Your Super Admin Password" : "Password"} <span className="text-status-danger">*</span></span>
+              <span className="relative block">
+                <Input ref={passwordInput} data-dialog-autofocus required disabled={busy} aria-invalid={!!error}
+                  aria-describedby={error ? "secure-action-password-error" : undefined}
+                  type={showPassword ? "text" : "password"} autoComplete="current-password"
+                  value={securityPassword} onChange={event => setSecurityPassword(event.target.value)} className="w-full pr-11" />
+                <button type="button" disabled={busy} onClick={() => setShowPassword(visible => !visible)}
+                  className="ui-icon-button ui-button--ghost absolute inset-y-0 end-0 border-transparent"
+                  aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff className="size-icon-compact" aria-hidden="true" /> : <Eye className="size-icon-compact" aria-hidden="true" />}
                 </button>
-              )}
-            </header>
-
-            {stage === "security" && (
-              <form onSubmit={verifyIdentity} className="space-y-4 px-5 py-5">
-                <p className="text-[13px] text-[#64748B]">
-                  Enter your account password to confirm this action.
-                </p>
-                <label className="block space-y-1.5">
-                  <span className="text-[12px] font-semibold text-[#374151]">
-                    Password <span className="text-[#DC2626]">*</span>
-                  </span>
-                  <span className="relative block">
-                    <input
-                      type={showPassword ? "text" : "password"}
-                      autoComplete="current-password"
-                      value={securityPassword}
-                      onChange={(event) => setSecurityPassword(event.target.value)}
-                      className="h-11 w-full rounded-[9px] border border-[#D1D5DB] px-3 pr-11 text-[14px] text-[#1F2937] outline-none focus:border-[#155D3B] focus:ring-2 focus:ring-[#155D3B]/15"
-                      autoFocus
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword((visible) => !visible)}
-                      className="absolute inset-y-0 right-3 flex items-center text-[#64748B]"
-                      aria-label={showPassword ? "Hide password" : "Show password"}
-                    >
-                      {showPassword ? (
-                        <EyeOff className="h-4 w-4" />
-                      ) : (
-                        <Eye className="h-4 w-4" />
-                      )}
-                    </button>
-                  </span>
-                </label>
-                {error && (
-                  <p role="alert" className="text-[12px] font-medium text-[#B91C1C]">
-                    {error}
-                  </p>
-                )}
-                <footer className="flex justify-end gap-2 border-t border-[#E5E7EB] pt-4">
-                  <button
-                    type="button"
-                    onClick={cancel}
-                    disabled={busy}
-                    className="h-10 rounded-lg border border-[#D1D5DB] px-4 text-[13px] font-semibold text-[#374151] hover:bg-[#F8FAFC]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={busy || !securityPassword}
-                    className="flex h-10 min-w-[112px] items-center justify-center gap-2 rounded-lg bg-[#155D3B] px-4 text-[13px] font-semibold text-white hover:bg-[#134A30] disabled:cursor-not-allowed disabled:bg-[#9CA3AF]"
-                  >
-                    {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                    Confirm
-                  </button>
-                </footer>
-              </form>
-            )}
-
-            {stage === "confirmation" && (
-              <div className="space-y-4 px-5 py-5">
-                <p className="text-[14px] text-[#374151]">{request.question}</p>
-                {request.details && request.details.length > 0 && (
-                  <dl className="space-y-2 rounded-lg bg-[#F8FAFC] p-3 text-[13px]">
-                    {request.details.map((detail) => (
-                      <div key={detail.label} className="flex gap-2">
-                        <dt className="font-semibold text-[#1F2937]">
-                          {detail.label}:
-                        </dt>
-                        <dd className="break-all text-[#475569]">{detail.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                )}
-                <footer className="flex justify-end gap-2 border-t border-[#E5E7EB] pt-4">
-                  <button
-                    type="button"
-                    onClick={cancel}
-                    disabled={busy}
-                    className="h-10 rounded-lg border border-[#D1D5DB] px-4 text-[13px] font-semibold text-[#374151] hover:bg-[#F8FAFC]"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void executeAction()}
-                    disabled={busy || !grant}
-                    className="flex h-10 min-w-[130px] items-center justify-center gap-2 rounded-lg bg-[#155D3B] px-4 text-[13px] font-semibold text-white hover:bg-[#134A30] disabled:cursor-not-allowed disabled:bg-[#9CA3AF]"
-                  >
-                    {busy && <LoaderCircle className="h-4 w-4 animate-spin" />}
-                    {request.confirmLabel}
-                  </button>
-                </footer>
-              </div>
-            )}
-
-            {stage === "result" && result && (
-              <div className="space-y-5 px-5 py-5">
-                <p
-                  role={result.success ? "status" : "alert"}
-                  className={`text-[14px] ${
-                    result.success ? "text-[#374151]" : "font-medium text-[#B91C1C]"
-                  }`}
-                >
-                  {result.message}
-                </p>
-                <footer className="flex justify-end border-t border-[#E5E7EB] pt-4">
-                  <button
-                    type="button"
-                    onClick={finish}
-                    className="h-10 min-w-[92px] rounded-lg bg-[#155D3B] px-4 text-[13px] font-semibold text-white hover:bg-[#134A30]"
-                  >
-                    OK
-                  </button>
-                </footer>
-              </div>
-            )}
-          </section>
-        </div>
+              </span>
+            </label>
+            {error && <p id="secure-action-password-error" role="alert" className="ui-action-feedback ui-action-feedback--error">{error}</p>}
+          </form>
+        </ActionDialog>
+      )}
+      {visible && request && stage === "confirmation" && (
+        <ConfirmActionDialog icon={request.icon ?? (request.action === "reject-loan" ? XCircle : request.action === "approve-loan" || request.action === "review-loan" ? FileCheck2 : undefined)} title={request.title} question={request.question} details={request.details}
+          confirmLabel={request.confirmLabel} tone={tone} busy={busy} disabled={!grant}
+          onClose={cancel} onConfirm={executeAction} returnFocusRef={actionTrigger} />
+      )}
+      {visible && stage === "result" && result && (
+        <ActionResultDialog title={result.success ? request?.successTitle ?? "Success" : "Action Failed"} success={result.success}
+          message={result.message} showClose={false} closeOnEscape={false} onClose={finish} returnFocusRef={actionTrigger} />
       )}
     </SecureAdminActionContext.Provider>
   );
@@ -409,10 +299,6 @@ export function SecureAdminActionProvider({
 
 export function useSecureAdminAction() {
   const context = useContext(SecureAdminActionContext);
-  if (!context) {
-    throw new Error(
-      "useSecureAdminAction must be used inside SecureAdminActionProvider."
-    );
-  }
+  if (!context) throw new Error("useSecureAdminAction must be used inside SecureAdminActionProvider.");
   return context;
 }

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1168 102" preserveAspectRatio="none">
+  <defs>
+    <linearGradient id="forest" x1="0" y1="1" x2="1" y2="0">
+      <stop stop-color="#005D38"/>
+      <stop offset=".48" stop-color="#003F29"/>
+      <stop offset="1" stop-color="#064F31"/>
+    </linearGradient>
+    <linearGradient id="band">
+      <stop stop-color="#078849"/>
+      <stop offset=".14" stop-color="#FFDA00"/>
+      <stop offset=".33" stop-color="#FFDA00"/>
+      <stop offset=".53" stop-color="#6CB73C"/>
+      <stop offset=".74" stop-color="#FFDA00"/>
+      <stop offset=".9" stop-color="#FFDA00"/>
+      <stop offset="1" stop-color="#078849"/>
+    </linearGradient>
+  </defs>
+  <path fill="url(#forest)" d="M0 49C122 18 249 95 430 102h305C904 97 1037 12 1168 12v90H0Z"/>
+  <path fill="url(#band)" d="M0 62c132-27 243 51 431 48h-94C213 100 115 62 0 88Zm730 47c164-10 303-86 438-84v30c-139-26-247 44-366 54Z"/>
+  <path fill="none" stroke="url(#band)" stroke-width="3" d="M-9 43C120 13 235 95 419 105c110 6 223 5 328 0C928 96 1042 7 1177 9"/>
+</svg>

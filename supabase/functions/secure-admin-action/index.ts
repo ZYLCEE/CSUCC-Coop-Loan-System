@@ -90,7 +90,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { mode, action, target, payload, secret, password, grant } = rawBody;
+    const { mode, action, target, payload, password, grant } = rawBody;
     const supabase = getSupabaseClient();
     const user = await getCurrentUser(req, supabase);
 

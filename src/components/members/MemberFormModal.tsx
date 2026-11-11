@@ -1,5 +1,7 @@
 "use client";
 
+import { Input, Select } from "@/components/ui/Fields";
+import { FormDialog } from "@/components/ui/FormDialog";
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
 import {
   FormEvent,
@@ -10,16 +12,14 @@ import {
   useState,
 } from "react";
 import {
-  CheckCircle2,
-  Circle,
   Eye,
   EyeOff,
   FileText,
   Info,
   UserRoundPlus,
-  X,
+  UserRoundPen,
 } from "lucide-react";
-import { Member, memberRoles } from "./MembersData";
+import { Member, creatableMemberRoles, memberRoles } from "./MembersData";
 import { membershipTypeOptions } from "@/lib/membership";
 import { getSupabaseClient } from "@/lib/supabase";
 
@@ -28,50 +28,46 @@ interface MemberFormModalProps {
   member: Member | null;
   onClose: () => void;
   onSubmit: (member: Member, temporaryPassword?: string) => void;
+  busy?: boolean;
 }
 
-interface FloatingFieldProps {
+interface AccountFieldProps {
   id: string;
   label: string;
+  className?: string;
   required?: boolean;
-  hint?: string;
   error?: string;
   errorAction?: ReactNode;
+  labelFeedback?: ReactNode;
   children: ReactNode;
 }
 
-const floatingControlClass =
-  "h-full w-full rounded-[9px] bg-transparent px-3 pt-[17px] pb-1 text-[14px] text-[#1F2937] focus:outline-none";
+const accountControlClass = "block w-full";
+const passwordControlClass = `${accountControlClass} pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden`;
 
-function FloatingField({
+function AccountField({
   id,
   label,
+  className = "",
   required = true,
-  hint,
   error,
   errorAction,
+  labelFeedback,
   children,
-}: FloatingFieldProps) {
+}: AccountFieldProps) {
   return (
-    <div>
-      <div className={`relative h-[50px] rounded-[9px] border bg-[#F8FAFC] transition-colors focus-within:bg-white focus-within:ring-2 ${error ? "border-[#DC2626] focus-within:border-[#DC2626] focus-within:ring-[#DC2626]/15" : "border-[#D1D5DB] focus-within:border-[#155D3B] focus-within:ring-[#155D3B]/15"}`}>
-        <label
-          htmlFor={id}
-          className="absolute left-3 top-[5px] z-10 cursor-text text-[11px] font-semibold leading-3 text-[#4B5563]"
-        >
-          {label} {required && <span className="text-[#DC2626]">*</span>}
+    <div className={`min-w-0 ${className}`}>
+      <div className="mb-0.5 flex flex-wrap items-baseline justify-between gap-x-2">
+        <label htmlFor={id} className="block text-[13px] leading-5 font-medium">
+          {label}{required && <span aria-hidden="true" className="ml-1 text-status-danger">*</span>}
         </label>
-        {children}
+        {labelFeedback}
       </div>
-      {error && (
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <p id={`${id}-error`} className="text-[11px] font-medium text-[#DC2626]" role="alert">
-            {error}
-          </p>
-          {errorAction}
-        </div>
-      )}
-      {hint && <p id={`${id}-hint`} className="mt-1 text-[11px] text-[#64748B]">{hint}</p>}
+      {children}
+      <div className={error ? "mt-1 flex flex-wrap items-start gap-x-2 gap-y-1" : "hidden"}>
+        <p id={`${id}-message`} className="text-caption leading-4 text-status-danger" aria-live="polite" aria-atomic="true">{error}</p>
+        {error && errorAction}
+      </div>
     </div>
   );
 }
@@ -120,6 +116,7 @@ export default function MemberFormModal({
   member,
   onClose,
   onSubmit,
+  busy = false,
 }: MemberFormModalProps) {
   const [formData, setFormData] = useState<Member>(member ?? emptyMember);
   const [temporaryPassword, setTemporaryPassword] = useState("");
@@ -177,6 +174,7 @@ export default function MemberFormModal({
     }
   }, [loadAccountIdPreview, mode]);
 
+  const availableRoles = mode === "add" ? creatableMemberRoles : memberRoles;
   const isMemberAccount = formData.role === "Member";
   const isRegularMembership =
     isMemberAccount && formData.membershipType === "regular";
@@ -218,20 +216,25 @@ export default function MemberFormModal({
     }
     if (!address) errors.address = "Address is required.";
     else if (address.length > 500) errors.address = "Address must be 500 characters or fewer.";
-    if (formData.role !== "Member" && formData.role !== "Admin") errors.role = "Select a valid account role.";
+    if (!availableRoles.includes(formData.role)) errors.role = "Select a valid account role.";
     if (isMemberAccount && !formData.membershipType) errors.membershipType = "Membership Type is required.";
     if (isRegularMembership && !normalizedDepartment) errors.department = "Department is required for Regular Members.";
+    else if (isRegularMembership && normalizedDepartment.length > 200) errors.department = "Department must be 200 characters or fewer.";
     if (mode === "add") {
       if (!temporaryPassword) errors.temporaryPassword = "Temporary Password is required.";
-      else if (!passwordPolicyPattern.test(temporaryPassword)) {
-        errors.temporaryPassword = "Use 8 or more characters with at least 1 uppercase, 1 lowercase, and 1 number.";
-      }
+      else if (temporaryPassword.length > 128) errors.temporaryPassword = "Temporary Password must be 128 characters or fewer.";
+      else if (temporaryPassword.length < 8) errors.temporaryPassword = "Use at least 8 characters.";
+      else if (!/[A-Z]/.test(temporaryPassword)) errors.temporaryPassword = "Add at least 1 uppercase letter.";
+      else if (!/[a-z]/.test(temporaryPassword)) errors.temporaryPassword = "Add at least 1 lowercase letter.";
+      else if (!/\d/.test(temporaryPassword)) errors.temporaryPassword = "Add at least 1 number.";
+      else if (!passwordPolicyPattern.test(temporaryPassword)) errors.temporaryPassword = "Password cannot contain line breaks.";
       if (!confirmTemporaryPassword) errors.confirmPassword = "Please confirm the temporary password.";
       else if (temporaryPassword !== confirmTemporaryPassword) errors.confirmPassword = "Temporary passwords do not match.";
       if (!identityVerified) errors.identityVerified = "Confirm that this person's identity has been verified.";
     }
     return errors;
   }, [
+    availableRoles,
     confirmTemporaryPassword,
     formData,
     identityVerified,
@@ -246,25 +249,26 @@ export default function MemberFormModal({
   for (const field of Object.keys(validationErrors) as (keyof MemberFormErrors)[]) {
     if (submitAttempted || touchedFields[field]) formErrors[field] = validationErrors[field];
   }
-  const passwordRequirements = [
-    { label: "At least 8 characters", met: temporaryPassword.length >= 8 },
-    { label: "One uppercase letter (A–Z)", met: /[A-Z]/.test(temporaryPassword) },
-    { label: "One lowercase letter (a–z)", met: /[a-z]/.test(temporaryPassword) },
-    { label: "One number (0–9)", met: /\d/.test(temporaryPassword) },
-    { label: "Both passwords match", met: temporaryPassword.length > 0 && temporaryPassword === confirmTemporaryPassword },
-  ];
+  // Advisory presentation only: submission still uses the existing COOP policy.
+  const passwordStrength = !temporaryPassword ? null
+    : validationErrors.temporaryPassword || /password|qwerty|123456|abcdef|admin/i.test(temporaryPassword) || /(.)\1{3}/.test(temporaryPassword)
+      ? { label: "Weak", color: "text-status-danger" }
+      : temporaryPassword.length >= 12 && /[^A-Za-z0-9\s]/.test(temporaryPassword) && new Set(temporaryPassword).size >= 8
+        ? { label: "Strong", color: "text-status-success" }
+        : { label: "Medium", color: "text-yellow-600" };
 
   const updateField = (field: keyof Member, value: string) => {
     if (field === "idNumber") return;
     setFormData((current) => {
       if (field === "role") {
-        const nextRole = value === "Admin" ? "Admin" : "Member";
+        const nextRole = availableRoles.find((role) => role === value);
+        if (!nextRole) return current;
 
         return {
           ...current,
           role: nextRole,
-          membershipType: nextRole === "Admin" ? null : current.membershipType,
-          department: nextRole === "Admin" ? "" : current.department,
+          membershipType: nextRole === "Member" ? current.membershipType : null,
+          department: nextRole === "Member" ? current.department : "",
         };
       }
 
@@ -294,7 +298,11 @@ export default function MemberFormModal({
     const normalizedEmail = formData.email.trim();
     const normalizedDepartment = formData.department.trim();
 
-    if (!canSubmit) return;
+    if (busy) return;
+    if (!canSubmit) {
+      document.getElementById(Object.keys(validationErrors)[0])?.focus();
+      return;
+    }
 
     const submittedPassword = mode === "add" ? temporaryPassword : undefined;
     onSubmit({
@@ -311,56 +319,28 @@ export default function MemberFormModal({
     }, submittedPassword);
   };
 
+  const dirty = JSON.stringify(formData) !== JSON.stringify(member ?? emptyMember) || !!temporaryPassword || !!confirmTemporaryPassword || identityVerified;
   return (
-    <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-[#111827]/50 p-4"
-      onMouseDown={onClose}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="member-form-title"
-    >
-      <form
-        onSubmit={handleSubmit}
-        noValidate
+    <FormDialog title={mode === "add" ? "Create Account" : "Edit Member"} icon={mode === "add" ? UserRoundPlus : UserRoundPen}
+      subtitle={mode === "edit" ? formData.idNumber : undefined} dirty={dirty} busy={busy} onClose={onClose}
+      className="ui-account-form max-w-[760px]" footer={<>
+        <button type="button" data-dialog-close disabled={busy} className="ui-button">Cancel</button>
+        <button type="submit" form="member-account-form" disabled={!canSubmit || busy} className="ui-button ui-button--primary">{mode === "add" ? "Create Account" : "Save Changes"}</button>
+      </>} closeLabel="Close member form">
+      <form id="member-account-form" onSubmit={handleSubmit} autoComplete="off" noValidate
         onBlurCapture={(event) => {
           const name = event.target.getAttribute("name");
           if (name) setTouchedFields((current) => ({ ...current, [name]: true }));
         }}
-        className="flex max-h-[calc(100dvh-2rem)] w-[min(760px,95vw)] flex-col overflow-hidden rounded-[12px] border border-[#E5E7EB] bg-white shadow-[0_24px_60px_rgba(15,23,42,0.28)]"
-        onMouseDown={(event) => event.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between border-b border-[#E5E7EB] px-5 py-4">
-          <div className="flex items-center gap-2.5">
-            {mode === "add" && (
-              <UserRoundPlus className="h-5 w-5 text-[#155D3B]" aria-hidden="true" />
-            )}
-            <div>
-              <h2 id="member-form-title" className="text-[20px] font-bold leading-6 text-[#172B45]">
-              {mode === "add" ? "Create Account" : "Edit Member"}
-              </h2>
-              {mode === "edit" && (
-                <p className="mt-0.5 text-[12px] text-[#6B7280]">{formData.idNumber}</p>
-              )}
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full text-[#6B7280] transition-colors hover:bg-[#F1F5F9] hover:text-[#155D3B]"
-            aria-label="Close member form"
-          >
-            <X className="h-4 w-4" />
-          </button>
-        </div>
-
-        <div className="grid min-h-0 flex-1 grid-cols-1 content-start gap-x-3.5 gap-y-2 overflow-y-auto px-5 py-3 sm:grid-cols-2">
-          <div className="col-span-full mb-0 flex items-center gap-2 text-[16px] font-bold text-[#273444]">
-            <FileText className="h-4 w-4 text-[#155D3B]" aria-hidden="true" />
+        <fieldset disabled={busy} className="grid min-w-0 grid-cols-1 content-start gap-x-3 gap-y-1.5 sm:grid-cols-2 md:grid-cols-3">
+          <h3 className="col-span-full flex items-center gap-2 border-b border-portal-border pb-1 text-[13px] leading-[18px] font-bold text-coop-primary">
+            <FileText className="h-4 w-4 text-coop-dashboard-green" aria-hidden="true" />
             <span>Account Information</span>
-          </div>
+          </h3>
 
           <div>
-            <FloatingField
+            <AccountField
               id="idNumber"
               label={mode === "add" ? "ID Number (Auto-generated)" : "ID Number"}
               required={false}
@@ -378,7 +358,7 @@ export default function MemberFormModal({
                 ) : undefined
               }
             >
-              <input
+              <Input
                 id="idNumber"
                 name="idNumber"
                 type="text"
@@ -394,118 +374,125 @@ export default function MemberFormModal({
                 }
                 readOnly
                 aria-readonly="true"
-                aria-describedby={mode === "edit" ? "idNumber-help" : undefined}
+                title="Account IDs are generated automatically and cannot be edited."
+                tabIndex={-1}
+                aria-describedby="idNumber-message"
+                aria-invalid={mode === "add" && !!accountIdPreviewError}
                 autoComplete="off"
-                className={`${floatingControlClass} read-only:cursor-not-allowed read-only:text-[#64748B]`}
+                className={`${accountControlClass} cursor-not-allowed read-only:text-portal-muted`}
               />
-            </FloatingField>
-            {mode === "edit" && (
-              <p id="idNumber-help" className="mt-1 text-[11px] text-[#64748B]">
-                Account IDs are generated automatically and cannot be edited.
-              </p>
-            )}
+            </AccountField>
           </div>
 
-          <FloatingField
+          <AccountField
             id="fullName"
             label="Full Name"
+            className="md:col-span-2"
             error={formErrors.fullName}
           >
-            <input
+            <Input
               id="fullName"
+              required
               name="fullName"
               type="text"
               value={formData.fullName}
               aria-invalid={Boolean(formErrors.fullName)}
-              aria-describedby={formErrors.fullName ? "fullName-error" : undefined}
-              autoComplete="name"
+              aria-describedby="fullName-message"
+              maxLength={200}
+              autoComplete="off"
               autoCapitalize="words"
               onChange={(event) => updateField("fullName", event.target.value)}
-              className={floatingControlClass}
+              className={accountControlClass}
             />
-          </FloatingField>
+          </AccountField>
 
-          <FloatingField
+          <AccountField
             id="email"
             label="Email Address"
             error={formErrors.email}
           >
-            <input
+            <Input
               id="email"
+              required
               name="email"
               type="email"
               value={formData.email}
               aria-invalid={Boolean(formErrors.email)}
-              aria-describedby={formErrors.email ? "email-error" : undefined}
-              autoComplete="email"
+              aria-describedby="email-message"
+              maxLength={100}
+              autoComplete="off"
               autoCapitalize="none"
               spellCheck={false}
               onChange={(event) => updateField("email", event.target.value)}
-              className={floatingControlClass}
+              className={accountControlClass}
             />
-          </FloatingField>
+          </AccountField>
 
-          <FloatingField id="phone" label="Contact Number" error={formErrors.phone}>
-            <input
+          <AccountField id="phone" label="Contact Number" error={formErrors.phone}>
+            <Input
               id="phone"
+              required
               name="phone"
               type="tel"
-              autoComplete="tel"
-              required
+              autoComplete="off"
               maxLength={20}
               value={formData.phone ?? ""}
               aria-invalid={Boolean(formErrors.phone)}
-              aria-describedby={formErrors.phone ? "phone-error" : undefined}
+              aria-describedby="phone-message"
               onChange={(event) => updateField("phone", event.target.value)}
-              className={floatingControlClass}
+              className={accountControlClass}
             />
-          </FloatingField>
+          </AccountField>
 
-          <FloatingField id="address" label="Address" error={formErrors.address}>
-            <input
+          <AccountField id="address" label="Address" error={formErrors.address}>
+            <Input
               id="address"
-              name="address"
-              autoComplete="street-address"
               required
+              name="address"
+              autoComplete="off"
               maxLength={500}
               value={formData.address ?? ""}
               aria-invalid={Boolean(formErrors.address)}
-              aria-describedby={formErrors.address ? "address-error" : undefined}
+              aria-describedby="address-message"
               onChange={(event) => updateField("address", event.target.value)}
-              className={floatingControlClass}
+              className={accountControlClass}
             />
-          </FloatingField>
+          </AccountField>
 
-          <FloatingField id="role" label="Role" error={formErrors.role}>
-            <select
+          <AccountField id="role" label="Role" error={formErrors.role}>
+            <Select
               id="role"
+              required
               name="role"
               value={formData.role}
+              aria-invalid={Boolean(formErrors.role)}
+              aria-describedby="role-message"
               onChange={(event) => updateField("role", event.target.value)}
-              className={floatingControlClass}
+              className={accountControlClass}
             >
-              {memberRoles.map((role) => (
+              {availableRoles.map((role) => (
                 <option key={role} value={role}>
                   {role}
                 </option>
               ))}
-            </select>
-          </FloatingField>
+            </Select>
+          </AccountField>
 
           {isMemberAccount && (
-            <FloatingField
+            <AccountField
               id="membershipType"
               label="Membership Type"
               error={formErrors.membershipType}
             >
-              <select
+              <Select
                 id="membershipType"
+                required
                 name="membershipType"
                 value={formData.membershipType ?? ""}
                 aria-invalid={Boolean(formErrors.membershipType)}
-                aria-describedby={formErrors.membershipType ? "membershipType-error" : undefined}
+                aria-describedby="membershipType-message"
                 onChange={(event) => updateField("membershipType", event.target.value)}
-                className={floatingControlClass}
+                className={accountControlClass}
               >
                 <option value="">Select membership type</option>
                 {membershipTypeOptions.map((membershipType) => (
@@ -513,47 +500,52 @@ export default function MemberFormModal({
                     {membershipType.label}
                   </option>
                 ))}
-              </select>
-            </FloatingField>
+              </Select>
+            </AccountField>
           )}
 
           {isRegularMembership && (
-            <FloatingField
+            <AccountField
               id="department"
               label="Department"
               error={formErrors.department}
             >
-              <input
+              <Input
                 id="department"
+                required
                 name="department"
                 type="text"
                 value={formData.department}
                 aria-invalid={Boolean(formErrors.department)}
-                aria-describedby={formErrors.department ? "department-error" : undefined}
+                aria-describedby="department-message"
+                maxLength={200}
                 onChange={(event) => updateField("department", event.target.value)}
-                className={floatingControlClass}
+                className={accountControlClass}
               />
-            </FloatingField>
-          )}
-          {isMemberAccount && !isRegularMembership && (
-            <div className="hidden sm:block" aria-hidden="true" />
+            </AccountField>
           )}
 
           {mode === "add" && (
             <>
-              <FloatingField
+              <div className="col-span-full grid grid-cols-1 items-start gap-x-3 gap-y-1.5 sm:grid-cols-2">
+              <AccountField
                 id="temporaryPassword"
                 label="Temporary Password"
                 error={formErrors.temporaryPassword}
+                labelFeedback={passwordStrength && <span id="temporaryPassword-strength" role="status" className={`text-caption font-semibold ${passwordStrength.color}`}>Strength: {passwordStrength.label}</span>}
               >
                 <div className="relative">
-                  <input
+                  <Input
                     id="temporaryPassword"
+                    required
                     name="temporaryPassword"
+                    autoComplete="new-password"
+                    minLength={8}
+                    maxLength={128}
                     type={showTemporaryPassword ? "text" : "password"}
                     value={temporaryPassword}
                     aria-invalid={Boolean(formErrors.temporaryPassword)}
-                    aria-describedby={`password-requirements${formErrors.temporaryPassword ? " temporaryPassword-error" : ""}`}
+                    aria-describedby={`temporaryPassword-message${passwordStrength ? " temporaryPassword-strength" : ""}`}
                     onChange={(event) => {
                       setTemporaryPassword(event.target.value);
                       setTouchedFields((current) => ({
@@ -561,12 +553,12 @@ export default function MemberFormModal({
                         temporaryPassword: true,
                       }));
                     }}
-                    className={`${floatingControlClass} pr-10`}
+                    className={passwordControlClass}
                   />
                   <button
                     type="button"
                     onClick={() => setShowTemporaryPassword((current) => !current)}
-                    className="absolute inset-y-0 right-3 flex items-center text-[#6B7280]"
+                    className="ui-icon-button ui-button--ghost absolute inset-y-0 end-0 border-transparent"
                     aria-label={
                       showTemporaryPassword
                         ? "Hide temporary password"
@@ -574,27 +566,30 @@ export default function MemberFormModal({
                     }
                   >
                     {showTemporaryPassword ? (
-                      <EyeOff className="h-4 w-4" />
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-4 w-4" aria-hidden="true" />
                     )}
                   </button>
                 </div>
-              </FloatingField>
+              </AccountField>
 
-              <FloatingField
+              <AccountField
                 id="confirmPassword"
                 label="Confirm Temporary Password"
                 error={formErrors.confirmPassword}
               >
                 <div className="relative">
-                  <input
+                  <Input
                     id="confirmPassword"
+                    required
                     name="confirmPassword"
+                    autoComplete="new-password"
+                    maxLength={128}
                     type={showConfirmPassword ? "text" : "password"}
                     value={confirmTemporaryPassword}
                     aria-invalid={Boolean(formErrors.confirmPassword)}
-                    aria-describedby={`password-requirements${formErrors.confirmPassword ? " confirmPassword-error" : ""}`}
+                    aria-describedby="confirmPassword-message"
                     onChange={(event) => {
                       setConfirmTemporaryPassword(event.target.value);
                       setTouchedFields((current) => ({
@@ -602,12 +597,12 @@ export default function MemberFormModal({
                         confirmPassword: true,
                       }));
                     }}
-                    className={`${floatingControlClass} pr-10`}
+                    className={passwordControlClass}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword((current) => !current)}
-                    className="absolute inset-y-0 right-3 flex items-center text-[#6B7280]"
+                    className="ui-icon-button ui-button--ghost absolute inset-y-0 end-0 border-transparent"
                     aria-label={
                       showConfirmPassword
                         ? "Hide confirmed password"
@@ -615,81 +610,49 @@ export default function MemberFormModal({
                     }
                   >
                     {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
                     ) : (
-                      <Eye className="h-4 w-4" />
+                      <Eye className="h-4 w-4" aria-hidden="true" />
                     )}
                   </button>
                 </div>
-              </FloatingField>
-
-              <div className="col-span-full rounded-[9px] border border-[#E1E7EF] bg-[#F8FAFC] p-3">
-                <p id="password-requirements-label" className="mb-2 text-[12px] font-semibold text-[#374151]">Temporary password requirements</p>
-                <ul id="password-requirements" aria-labelledby="password-requirements-label" className="grid gap-1.5 text-[11px] sm:grid-cols-2">
-                  {passwordRequirements.map(({ label, met }) => (
-                    <li key={label} className={`flex items-center gap-2 ${met ? "text-[#155D3B]" : temporaryPassword || confirmTemporaryPassword ? "text-[#B91C1C]" : "text-[#64748B]"}`}>
-                      {met ? <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" /> : <Circle className="h-3.5 w-3.5" aria-hidden="true" />}
-                      <span>{met ? "Met: " : "Required: "}{label}</span>
-                    </li>
-                  ))}
-                </ul>
+              </AccountField>
               </div>
 
-              <div className="col-span-full flex items-center gap-2">
-                <Info className="h-4 w-4 shrink-0 text-[#155D3B]" aria-hidden="true" />
-                <p className="text-[11px] leading-4 font-medium text-[#647084]">
-                  Provide the temporary login credentials privately to the account holder.
-                </p>
-              </div>
-
-              <label className="col-span-full flex items-center gap-2.5 rounded-[9px] border border-[#E5D9C2] bg-[#F8F9FB] px-3 py-2">
+              <div className="col-span-full">
+              <label className="flex items-start gap-2.5">
                 <input
+                  id="identityVerified"
+                  name="identityVerified"
                   type="checkbox"
+                  required
                   checked={identityVerified}
+                  aria-required="true"
+                  aria-invalid={Boolean(formErrors.identityVerified)}
+                  aria-describedby="identityVerified-message"
                   onChange={(event) => {
                     setIdentityVerified(event.target.checked);
                     setTouchedFields((current) => ({ ...current, identityVerified: true }));
                   }}
-                  className="h-4 w-4 shrink-0 rounded border-[#D1D5DB] text-[#155D3B] focus:ring-[#155D3B]/20"
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-portal-border-control text-coop-dashboard-green focus:ring-[#155D3B]/20"
                 />
-                <span className="text-[12px] font-medium text-[#374151]">
+                <span className="text-caption font-medium text-[#374151]">
                   I confirm this person&apos;s identity has been verified.
                 </span>
               </label>
-              {formErrors.identityVerified && (
-                <p className="col-span-full text-[11px] font-medium text-[#DC2626]">
+                <p id="identityVerified-message" hidden={!formErrors.identityVerified} className="mt-1 text-caption leading-5 text-status-danger" aria-live="polite">
                   {formErrors.identityVerified}
                 </p>
-              )}
+              </div>
             </>
           )}
-          {!canSubmit && (Object.keys(touchedFields).length > 0 || submitAttempted) && (
-            <div className="col-span-full rounded-[9px] border border-[#FECACA] bg-[#FEF2F2] px-3 py-2 text-[11px] text-[#B91C1C]" aria-live="polite">
-              <p className="font-semibold">Complete these requirements to enable {mode === "add" ? "Create Account" : "Save Changes"}:</p>
-              <ul className="mt-1 list-disc space-y-0.5 pl-4">
-                {Object.entries(validationErrors).map(([field, message]) => <li key={field}>{message}</li>)}
-              </ul>
-            </div>
-          )}
-        </div>
+          <p className="col-span-full flex items-start gap-2 text-caption leading-4 text-portal-secondary">
+            <Info className="h-4 w-4 shrink-0 text-coop-dashboard-green" aria-hidden="true" />
+            <span>{mode === "add" && "Share temporary credentials privately. "}Your Super Admin password is required to confirm.</span>
+          </p>
+        </fieldset>
 
-        <div className="flex shrink-0 justify-end gap-2 border-t border-[#E5E7EB] px-5 py-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-[44px] min-w-[140px] rounded-[9px] border border-[#D9DFE8] bg-white px-5 text-[14px] font-semibold text-[#344154] transition-colors hover:bg-[#F9FAFB]"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={!canSubmit}
-            className="h-[44px] min-w-[140px] rounded-[9px] bg-gradient-to-r from-[#0E2E43] to-[#155D3B] px-5 text-[14px] font-semibold text-white transition-colors hover:brightness-110 disabled:cursor-not-allowed disabled:from-[#9CA3AF] disabled:to-[#9CA3AF]"
-          >
-            {mode === "add" ? "Create Account" : "Save Changes"}
-          </button>
-        </div>
       </form>
-    </div>
+    </FormDialog>
   );
 }

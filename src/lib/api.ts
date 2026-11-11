@@ -11,7 +11,7 @@ export interface LoanApplication {
   type: string;
   membershipType?: MembershipType;
   amount: string;
-  status: "Pending" | "Under Review" | "Approved" | "Rejected" | "Released" | "Completed" | "Overdue";
+  status: "Pending" | "Returned" | "Approved" | "Rejected" | "Released" | "Completed" | "Overdue";
   date: string;
 }
 
@@ -34,7 +34,7 @@ interface SupabaseLoanRecord {
 }
 
 const loanApplicationSelect =
-  "application_id, member_name, loan_type, amount, status, date_submitted, members(id, member_id, first_name, last_name, membership_type)";
+  "application_id, member_name, loan_type, amount, status, date_submitted, members:members!loan_applications_member_id_fkey(id, member_id, first_name, last_name, membership_type)";
 
 function parseSupabaseLoanRecord(value: unknown): SupabaseLoanRecord {
   if (typeof value !== "object" || value === null) {
@@ -88,7 +88,7 @@ function parseSupabaseLoanRecord(value: unknown): SupabaseLoanRecord {
 function isLoanStatus(value: string): value is LoanApplication["status"] {
   return [
     "Pending",
-    "Under Review",
+    "Returned",
     "Approved",
     "Rejected",
     "Released",
@@ -99,7 +99,7 @@ function isLoanStatus(value: string): value is LoanApplication["status"] {
 
 function toLoanApplication(value: unknown): LoanApplication {
   const row = parseSupabaseLoanRecord(value);
-  const statusLabel = row.status
+  const statusLabel = (row.status.trim().toLowerCase().replaceAll("_"," ")==="under review"?"pending":row.status)
     .split(" ")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
     .join(" ");
@@ -157,7 +157,7 @@ export async function fetchLoanApplications(): Promise<LoanApplication[]> {
   const { data, error } = await getSupabaseClient()
     .from("loan_applications")
     .select(loanApplicationSelect)
-    .in("status", ["pending", "under review", "approved", "rejected"])
+    .in("status", ["pending", "under review", "returned", "approved", "rejected"])
     .order("date_submitted", { ascending: false });
   if (error) {
     throw error;

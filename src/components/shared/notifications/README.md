@@ -1,5 +1,7 @@
 # Administrator notification inbox and member messages
 
+Updated November 11, 2026: see [role-specific activity notifications](../../../../docs/portal-activity/README.md). The publication, recipient boundary, incoming activity page and event fan-out described as gaps below are now implemented. The remaining text records the earlier inbox implementation and its original constraints.
+
 ## Files
 
 - `../Navbar.tsx`: replaces the bell's page navigation with the popover, removes

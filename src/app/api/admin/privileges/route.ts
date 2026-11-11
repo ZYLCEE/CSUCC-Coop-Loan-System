@@ -1,3 +1,4 @@
+import {portalActivityHeaders} from "@/lib/portalActivityServer";
 import { createClient } from "@supabase/supabase-js";
 import { assignedPrivileges, isActiveAdministrator, validatePrivileges } from "@/lib/adminPrivileges";
 
@@ -11,7 +12,7 @@ async function handle(request: Request) {
   try {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL, key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return fail("Server-side account configuration is missing.", 503);
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const client = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:portalActivityHeaders(request)}});
     const token = request.headers.get("authorization")?.match(/^Bearer (.+)$/)?.[1];
     if (!token) return fail("Sign in to continue.", 401);
     const { data: { user }, error } = await client.auth.getUser(token);

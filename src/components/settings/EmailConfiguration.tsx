@@ -10,11 +10,11 @@ export default function EmailConfiguration() {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
   const handleSaveEmailConfig = () => {
-    console.log("Saving email configuration");
+    // Legacy preview has no email settings API.
   };
 
   return (
-    <div className="bg-white rounded-[14px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
+    <section className="space-y-3"><p role="note" className="text-support text-portal-muted">Legacy preview: these controls are unavailable and do not save changes. Use the current portal settings.</p><fieldset disabled><div className="bg-white rounded-[14px] shadow-[0_2px_10px_rgba(0,0,0,0.05)] border border-[#E5E7EB] p-4">
       <h2 className="text-[16px] font-bold text-[#111827] mb-4">Email Configuration</h2>
 
       <div className="space-y-3">
@@ -96,6 +96,6 @@ export default function EmailConfiguration() {
       >
         Save Email Config
       </button>
-    </div>
+    </div></fieldset></section>
   );
 }

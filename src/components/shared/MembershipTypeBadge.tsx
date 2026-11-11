@@ -1,14 +1,11 @@
-import { MembershipType, getMembershipTypeLabel } from "@/lib/membership";
+import { getMembershipTypeLabel, type MembershipType } from "@/lib/membership";
+import { Badge } from "@/components/ui/StatusBadge";
 
 interface MembershipTypeBadgeProps {
   membershipType?: MembershipType;
 }
 
-const badgeStyles: Record<"regular" | "associate" | "unset", string> = {
-  regular: "border-[#BBF7D0] bg-[#F0FDF4] text-[#15803D]",
-  associate: "border-[#BFDBFE] bg-[#EFF6FF] text-[#2563EB]",
-  unset: "border-[#E5E7EB] bg-[#F8FAFC] text-[#64748B]",
-};
+const membershipTones = { regular: "success", associate: "info", unset: "neutral" } as const;
 
 export default function MembershipTypeBadge({
   membershipType,
@@ -16,10 +13,8 @@ export default function MembershipTypeBadge({
   const styleKey = membershipType ?? "unset";
 
   return (
-    <span
-      className={`inline-flex h-6 max-w-full items-center whitespace-nowrap rounded-full border px-2.5 text-[10px] font-semibold ${badgeStyles[styleKey]}`}
-    >
+    <Badge tone={membershipTones[styleKey]} className="max-w-full whitespace-normal">
       {getMembershipTypeLabel(membershipType ?? null)}
-    </span>
+    </Badge>
   );
 }

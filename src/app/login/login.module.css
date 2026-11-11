@@ -1,0 +1,532 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #003f2e;
+  color: #fff;
+  color-scheme: light;
+}
+
+.scene {
+  --top-ribbon-width: clamp(230px, 35vw, 650px);
+  --bottom-ribbon-height: clamp(48px, 4.8vw, 108px);
+  --photo-position: 58%;
+  --sky-scale: 1.55;
+  --sky-solid: 55%;
+  --sky-fade: 60%;
+
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.campusPhoto {
+  object-fit: cover;
+  object-position: center var(--photo-position);
+  filter: blur(.65px);
+  transform: scale(1.008);
+}
+
+/* Blend the clean upper sky over the lettering baked into the photo above the roof. */
+.sky {
+  position: absolute;
+  inset: 0;
+  mask-image: linear-gradient(#000 var(--sky-solid), transparent var(--sky-fade));
+}
+
+.sky .campusPhoto {
+  object-position: center top;
+  filter: blur(1.5px);
+  transform: scale(var(--sky-scale));
+  transform-origin: center top;
+}
+
+.scene::after {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  background:
+    url("/images/coop-login-top-ribbon.svg") right top / var(--top-ribbon-width) auto no-repeat,
+    url("/images/coop-login-bottom-ribbon.svg") center bottom / 100% var(--bottom-ribbon-height) no-repeat,
+    linear-gradient(168deg, #003f2ee0 0%, #004b50c9 32%, #00576495 60%, #005a3c3b 83%, #003f2e70);
+  content: "";
+}
+
+.university {
+  display: flex;
+  width: fit-content;
+  max-width: calc(100% - 32px);
+  align-items: center;
+  gap: 8px;
+  margin: 22px 0 0 clamp(24px, 4.8vw, 70px);
+  text-shadow: 0 2px 10px #002b22a6;
+}
+
+.universityLogo {
+  flex: none;
+  width: 42px;
+  height: auto;
+}
+
+.universityName {
+  display: grid;
+  padding: 2px 0 2px 9px;
+  border-left: 1px solid #ffffffe0;
+  line-height: 1.17;
+  text-transform: uppercase;
+}
+
+.universityName strong {
+  font-size: clamp(14px, 1.18vw, 16px);
+  font-weight: 750;
+}
+
+.universityName span {
+  font-size: clamp(11px, .95vw, 13px);
+  font-weight: 500;
+}
+
+.layout {
+  display: grid;
+  width: min(1260px, 100% - clamp(48px, 16vw, 220px));
+  grid-template-columns: minmax(0, 1.14fr) minmax(0, 1fr);
+  align-items: center;
+  align-self: center;
+  gap: clamp(28px, 4.6vw, 90px);
+  margin: 8px auto clamp(18px, calc(100dvh - 578px), 23dvh);
+  padding-inline-start: 24px;
+}
+
+.brand {
+  text-align: center;
+  text-shadow: 0 2px 12px #002b22b3;
+}
+
+.logo {
+  position: relative;
+  isolation: isolate;
+  width: 248px;
+  max-width: 100%;
+  /* Offset the transparent padding around the seal. */
+  margin: -12px auto -30px;
+}
+
+.seal {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.title {
+  margin-top: 8px;
+  font-size: clamp(26px, 2.35vw, 34px);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.04em;
+  text-wrap: balance;
+}
+
+.title span {
+  color: #ffda00;
+}
+
+.tagline {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: clamp(6px, 1vw, 12px);
+  margin-top: 8px;
+  font-size: clamp(12px, 1.05vw, 14px);
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+.tagline::before,
+.tagline::after {
+  flex: 1 0 14px;
+  max-width: 72px;
+  height: 2px;
+  border-radius: 2px;
+  background: #ffda00;
+  content: "";
+}
+
+.card {
+  width: 100%;
+  max-width: 384px;
+  justify-self: center;
+  padding: 16px 18px 14px;
+  border-radius: 22px;
+  background: #fff;
+  color: #192230;
+  box-shadow: 0 18px 45px #0006, 0 4px 14px #0003;
+}
+
+.cardHeader {
+  margin-bottom: 10px;
+  text-align: center;
+}
+
+.cardHeader h2 {
+  color: #093d2c;
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.cardHeader p {
+  margin-top: 7px;
+  color: #53606f;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.field + .field {
+  margin-top: 7px;
+}
+
+.field label {
+  display: block;
+  margin-bottom: 3px;
+  color: #075536;
+  font-size: 13px;
+  font-weight: 650;
+  line-height: 1.25;
+}
+
+.passwordLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.passwordLabel label {
+  margin: 0;
+}
+
+.fieldError,
+.capsLock {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.fieldError {
+  margin-top: 4px;
+  color: #a52222;
+}
+
+.capsLock {
+  color: #80520c;
+}
+
+.fieldError svg,
+.capsLock svg {
+  flex: none;
+}
+
+.inputGroup {
+  position: relative;
+}
+
+.fieldIcon {
+  position: absolute;
+  inset-inline-start: 13px;
+  top: 50%;
+  color: #47695d;
+  pointer-events: none;
+  transform: translateY(-50%);
+}
+
+.input {
+  display: block;
+  width: 100%;
+  height: 42px;
+  padding-inline: 42px 12px;
+  border: 1px solid #c7d1cf;
+  border-radius: 11px;
+  background: #fff;
+  color: #192230;
+  font-size: 16px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
+}
+
+.input::placeholder {
+  color: #5e6c75;
+  font-size: 13px;
+  opacity: 1;
+}
+
+.input:focus {
+  border-color: #00633f;
+  outline: 2px solid transparent;
+  box-shadow: 0 0 0 3px #00633f1f;
+}
+
+.input[aria-invalid="true"]:not(:focus) {
+  border-color: #a52222;
+}
+
+.passwordInput {
+  padding-inline-end: 46px;
+}
+
+.toggle {
+  position: absolute;
+  inset: 1px 1px 1px auto;
+  display: grid;
+  width: 44px;
+  place-items: center;
+  border-radius: 10px;
+  color: #47695d;
+  cursor: pointer;
+}
+
+.toggle:hover {
+  color: #00552f;
+}
+
+.toggle:focus-visible,
+.submit:focus-visible {
+  outline: 2px solid #08733c;
+  outline-offset: 2px;
+}
+
+.error {
+  margin-top: 12px;
+  color: #a52222;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.submit {
+  display: flex;
+  width: 100%;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  margin-top: 10px;
+  padding-inline: 12px;
+  border-radius: 13px;
+  background: #ffda00;
+  color: #00452c;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+.submit:hover:not(:disabled) {
+  background: #f4cb00;
+  box-shadow: 0 4px 11px #5d4d0029;
+}
+
+.submit:disabled {
+  color: #305238;
+  cursor: not-allowed;
+}
+
+.spinner {
+  animation: spin 800ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 6px;
+  color: #53606f;
+  font-size: 12px;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.notice svg {
+  flex: none;
+  color: #08723f;
+}
+
+@keyframes cardEnter {
+  from {
+    opacity: .86;
+    transform: translateY(10px);
+  }
+}
+
+@keyframes sealGlow {
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes tintDrift {
+  0% {
+    transform: translateX(-3%);
+  }
+
+  50% {
+    opacity: 1;
+  }
+
+  100% {
+    transform: translateX(3%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .card {
+    animation: cardEnter 420ms cubic-bezier(.2, .75, .25, 1);
+  }
+
+  .logo::before,
+  .scene::before {
+    position: absolute;
+    pointer-events: none;
+    opacity: 0;
+    content: "";
+  }
+
+  .logo::before {
+    z-index: -1;
+    inset: 0;
+    background: radial-gradient(circle, #91dd4838 36%, transparent 67%);
+    animation: sealGlow 6s ease-in-out;
+  }
+
+  .scene::before {
+    z-index: 1;
+    inset: -5%;
+    background: radial-gradient(ellipse at 36% 28%, #08734d2b, transparent 58%);
+    animation: tintDrift 26s ease-in-out;
+  }
+
+  .submitIcon {
+    transition: transform 180ms ease;
+  }
+
+  .submit:hover:not(:disabled) .submitIcon {
+    transform: translateX(2px);
+  }
+}
+
+@media (min-aspect-ratio: 3 / 2) {
+  .scene {
+    --sky-scale: 1.38;
+  }
+}
+
+@media (min-aspect-ratio: 2 / 1) {
+  .scene {
+    --photo-position: 73%;
+    --sky-solid: 42%;
+    --sky-fade: 49%;
+  }
+}
+
+@media (max-width: 1023px) {
+  .layout {
+    width: calc(100% - 48px);
+    gap: 24px;
+    margin-block-end: clamp(18px, calc(100dvh - 578px), 16dvh);
+    padding-inline-start: 0;
+  }
+
+  .logo {
+    width: 192px;
+    margin-block: -10px -23px;
+  }
+}
+
+@media (min-width: 768px) {
+  .brand {
+    translate: 0 -16px;
+  }
+}
+
+@media (max-width: 767px) {
+  .scene {
+    --top-ribbon-width: clamp(110px, 32vw, 220px);
+    --bottom-ribbon-height: 38px;
+  }
+
+  .university {
+    gap: 7px;
+    margin: 14px 0 0 16px;
+  }
+
+  .universityLogo {
+    width: 34px;
+  }
+
+  .universityName {
+    padding-inline-start: 7px;
+  }
+
+  .universityName strong {
+    font-size: clamp(12px, 3.25vw, 14px);
+  }
+
+  .universityName span {
+    font-size: clamp(10px, 2.65vw, 12px);
+  }
+
+  .layout {
+    width: calc(100% - 32px);
+    grid-template-columns: minmax(0, 1fr);
+    gap: 19px;
+    margin-block: 12px 42px;
+  }
+
+  .logo {
+    width: 112px;
+    margin-block: -6px -12px;
+  }
+
+  .title {
+    font-size: clamp(20px, 5.4vw, 27px);
+  }
+
+  .card {
+    padding-inline: 16px;
+  }
+}
+
+@media (any-pointer: coarse), (max-width: 767px) {
+  .input {
+    height: 46px;
+  }
+
+  .submit {
+    min-height: 44px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+
+  .input,
+  .submit {
+    transition: none;
+  }
+}

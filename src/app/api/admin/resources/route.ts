@@ -1,5 +1,7 @@
+import {portalActivityHeaders} from "@/lib/portalActivityServer";
 import { createClient } from '@supabase/supabase-js';
 import { hasAdminPrivilege, isActiveAdministrator } from '@/lib/adminPrivileges';
+import { fetchActiveLoanRecords } from '@/lib/activeLoansData';
 
 const tables: Record<string, string> = { active: 'loan_applications', loans: 'loan_applications', members: 'members', payments: 'loan_payments', audit: 'admin_activity_logs' };
 const configNames = new Set(['general']);
@@ -14,7 +16,7 @@ async function handle(request: Request) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!url || !key) return Response.json({ error: 'Server-side Supabase configuration is missing.' }, { status: 503 });
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
+    const client = createClient(url,key,{auth:{persistSession:false,autoRefreshToken:false},global:{headers:portalActivityHeaders(request)}});
     const bearer = request.headers.get('authorization')?.match(/^Bearer (.+)$/)?.[1];
     if (!bearer) return Response.json({ error: 'Sign in to continue.' }, { status: 401 });
     const { data: { user }, error } = await client.auth.getUser(bearer);
@@ -29,6 +31,10 @@ async function handle(request: Request) {
         : resource === 'documents' && request.method === 'DELETE' ? 'documents.delete' : null;
       if (!privilege || !hasAdminPrivilege(user, privilege)) return Response.json({ error: 'You do not have permission to perform this action.' }, { status: 403 });
     }
+    if (resource === 'active' && !write) {
+      return Response.json(await fetchActiveLoanRecords(client), { headers: { 'Cache-Control': 'no-store' } });
+    }
+    if(resource==="audit"&&!write)return new Response(null,{status:307,headers:{Location:"/api/admin/active-logs","Cache-Control":"no-store"}});
     if (tables[resource] && !write) {
       const rows: Record<string, unknown>[] = [];
       for (let offset = 0; ; offset += 500) {
@@ -37,7 +43,7 @@ async function handle(request: Request) {
         rows.push(...data);
         if (data.length < 500) break;
       }
-      return Response.json(resource === 'active' ? rows.filter(row => ['released','overdue'].includes(String(row.status))) : rows, { headers: { 'Cache-Control': 'no-store' } });
+      return Response.json(rows, { headers: { 'Cache-Control': 'no-store' } });
     }
     if (!configNames.has(resource) && resource !== 'documents') return Response.json({ error: 'Unknown resource or unsupported operation.' }, { status: 400 });
     if (resource === 'documents' && !write) {

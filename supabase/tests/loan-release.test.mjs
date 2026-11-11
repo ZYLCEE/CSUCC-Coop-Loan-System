@@ -24,15 +24,23 @@ test('loan release SQL: approval/date checks, authorization, retry safety, audit
       create table auth.users(id uuid primary key, raw_app_meta_data jsonb, raw_user_meta_data jsonb default '{}', email text, banned_until timestamptz);
       create function auth.uid() returns uuid language sql stable as $$ select (current_setting('request.jwt.claims',true)::jsonb->>'sub')::uuid $$;
       grant usage on schema auth,public to authenticated,service_role;
-      create table public.loan_applications(id uuid default gen_random_uuid() primary key, application_id text unique, member_name text, amount numeric, status text, date_submitted date, date_approved date, date_released date, date_completed date, updated_at timestamptz default now());
+      create table public.loan_applications(id uuid default gen_random_uuid() primary key, application_id text unique, member_name text, amount numeric, status text, date_submitted date, date_approved date, date_released date, date_completed date, tenure_months integer, updated_at timestamptz default now());
       create table public.loan_payments(id uuid default gen_random_uuid() primary key, loan_application_id uuid not null references public.loan_applications(id), payment_amount numeric not null, payment_date date not null, payment_method varchar(50) default 'cash' constraint loan_payments_payment_method_check check(payment_method in ('cash')), notes text, created_at timestamptz default now());
       create table public.admin_activity_logs(id uuid default gen_random_uuid() primary key, actor_id uuid not null, action_name text not null, target_id text not null, result text not null, details jsonb not null, created_at timestamptz default now());
+      create table public.loan_policy_settings(singleton boolean primary key, base_interest_rate numeric, processing_fee_percent numeric, service_fee_percent numeric, penalty_rate_percent numeric, updated_at timestamptz default now());
+      insert into public.loan_policy_settings values(true,2,1,0.5,1,now());
     `);
     for (const [id, role] of [[superId, 'super_admin'], [adminId, 'admin'], [memberId, 'member']]) await query('insert into auth.users(id,raw_app_meta_data,email) values($1,$2,$3)', [id, JSON.stringify({ role, account_status: 'active' }), `${role}@test.invalid`]);
     await query("insert into public.loan_applications(id,application_id,member_name,amount,status,date_submitted,date_approved) values($1,'APP-001','Member One',1000,'approved','2026-01-01','2026-01-02')", [loanId]);
     for (const [application, status] of [['APP-002', 'pending'], ['APP-003', 'under review'], ['APP-004', 'rejected'], ['APP-005', 'completed'], ['APP-006', 'overdue'], ['APP-007', 'approved']]) await query("insert into public.loan_applications(application_id,member_name,amount,status,date_submitted,date_approved) values($1,'Member',1000,$2,'2026-01-01','2026-01-02')", [application, status]);
-    const migration = readFileSync(new URL('../migrations/20261029_loan_release.sql', import.meta.url), 'utf8');
-    await db.exec(migration); await db.exec(migration);
+    const releaseMigration = readFileSync(new URL('../migrations/20261029_loan_release.sql', import.meta.url), 'utf8');
+    await db.exec(releaseMigration); await db.exec(releaseMigration);
+    for (const file of [
+      '20261029_counter_payments.sql',
+      '20261029_fix_counter_payment_method.sql',
+      '20261108144000_automatic_counter_payments.sql',
+      '20261108180000_counter_payment_interest.sql',
+    ]) await db.exec(readFileSync(new URL(`../migrations/${file}`, import.meta.url), 'utf8'));
     for (const id of [adminId, memberId]) { await login(id); await assert.rejects(release(), error => error.code === '42501'); }
     await owner(); await db.exec('set role anon');
     await assert.rejects(release(), error => error.code === '42501');
@@ -52,6 +60,10 @@ test('loan release SQL: approval/date checks, authorization, retry safety, audit
     const request = crypto.randomUUID();
     const saved = await release({ request, reference: ' DV-001 ', notes: 'Signed voucher checked' });
     assert.equal(saved.status, 'released'); assert.equal(saved.date_released, '2026-01-03'); assert.equal(saved.release_reference, 'DV-001');
+    assert.equal(Number(saved.interest_rate_at_release), 2);
+    assert.equal(Number(saved.processing_fee_amount_at_release), 10);
+    assert.equal(Number(saved.service_fee_amount_at_release), 5);
+    assert.equal(Number(saved.net_proceeds), 985);
     assert.deepEqual(await release({ request, notes: 'Signed voucher checked' }), saved);
     await assert.rejects(release({ request, reference: 'different' }), /different release/);
     await assert.rejects(release(), /Only approved/);
@@ -59,12 +71,14 @@ test('loan release SQL: approval/date checks, authorization, retry safety, audit
     await owner();
     const row = (await query('select * from public.loan_applications where id=$1', [loanId]))[0];
     assert.equal(row.released_by, superId); assert.equal(row.released_by_name, 'super_admin@test.invalid');
+    assert.equal(Number(row.interest_rate_at_release), 2);
+    assert.equal(Number(row.processing_fee_amount_at_release), 10);
+    assert.equal(Number(row.service_fee_amount_at_release), 5);
     assert.equal((await query("select status from public.loan_applications where application_id='APP-007'"))[0].status, 'approved');
     const audit = await query('select * from public.admin_activity_logs');
     assert.equal(audit.length, 1); assert.equal(audit[0].action_name, 'release-loan'); assert.equal(audit[0].details.disbursement_reference, 'DV-001');
     assert.equal(audit[0].details.amount, 1000);
-    // Run both migrations and verify the released loan is immediately eligible for receipts.
-    await db.exec(readFileSync(new URL('../migrations/20261029_counter_payments.sql', import.meta.url), 'utf8'));
+    // Verify the released loan is immediately eligible for receipts.
     await login(superId);
     await query("select public.record_counter_payment($1,$2,'OR-001','2026-01-03',100,10,0,0,'')", [loanId, crypto.randomUUID()]);
     const ledger = (await query('select public.loan_payment_ledger($1) as result', [loanId]))[0].result;

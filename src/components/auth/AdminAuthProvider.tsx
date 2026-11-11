@@ -17,12 +17,17 @@ import {
 } from "@supabase/supabase-js";
 import { useRouter } from "next/navigation";
 import { getSupabaseClient } from "@/lib/supabase";
+import { useLoginTransition } from "./LoginTransitionProvider";
 import { hasAdminPrivilege, isActiveAdministrator, type AdminPrivilege } from "@/lib/adminPrivileges";
 import {
   type AdminRole,
   getAdminDashboardPath,
   getAdminRole,
 } from "@/lib/auth/roles";
+import {getCommitteeRole,getPortalDashboardPath} from "@/lib/committee";
+import {resolvePortalAccess} from "@/lib/committeeAuth";
+import PortalSessionBoundary from "./PortalSessionBoundary";
+import {portalSessionAction} from "@/lib/portalSession";
 
 interface AdminAuthContextValue {
   user: User | null;
@@ -68,9 +73,14 @@ export function AdminAuthProvider({
     }
   }, []);
   const configurationError = clientState.error ?? sessionError;
+  const { finish } = useLoginTransition();
   const router = useRouter();
   const role = getAdminRole(user);
   const activeAdministrator = isActiveAdministrator(user);
+
+  useEffect(() => {
+    if (configurationError) finish();
+  }, [configurationError, finish]);
 
   useEffect(() => {
     const client = clientState.client;
@@ -162,19 +172,28 @@ export function AdminAuthProvider({
     if (loading || configurationError) {
       return;
     }
+    if(getCommitteeRole(user)){
+      let active=true;
+      void resolvePortalAccess().then(access=>{
+        if(!active)return;
+        router.replace(access.setupRequired?"/auth/committee-setup":access.allowed && access.role?getPortalDashboardPath(access.role):"/login");
+      }).catch(()=>{if(active)router.replace("/login");});
+      return()=>{active=false;};
+    }
     if (!activeAdministrator || !role) {
       router.replace("/login");
     } else if (requiredRole && role !== requiredRole) {
       router.replace(getAdminDashboardPath(role));
     }
-  }, [activeAdministrator, configurationError, loading, requiredRole, role, router]);
+  }, [activeAdministrator, configurationError, loading, requiredRole, role, router,user]);
 
   const signOut = async () => {
     const supabase = clientState.client;
     if (!supabase) {
       throw new Error(clientState.error ?? "Supabase configuration is unavailable.");
     }
-    const { error } = await supabase.auth.signOut();
+    await portalSessionAction("logout").catch(()=>{});
+    const { error } = await supabase.auth.signOut({scope:"local"});
     if (error) {
       throw error;
     }
@@ -226,7 +245,7 @@ export function AdminAuthProvider({
     <AdminAuthContext.Provider
       value={{ user, role, loading, configurationError, signOut, refreshUser, can: privilege => hasAdminPrivilege(user, privilege) }}
     >
-      {children}
+      <PortalSessionBoundary>{children}</PortalSessionBoundary>
     </AdminAuthContext.Provider>
   );
 }
