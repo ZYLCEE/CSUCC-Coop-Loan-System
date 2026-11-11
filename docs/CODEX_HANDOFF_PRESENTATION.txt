@@ -1,0 +1,86 @@
+CSUCC COOP LOAN SYSTEM — CODEX HANDOFF NOTES
+================================================
+
+PURPOSE AND PROJECT CONTEXT
+---------------------------
+This repository is being prepared for an academic project presentation using
+synthetic member, borrower, co-maker, witness, and loan data. The records do
+not represent real borrowers or actual money, and this project is not being
+prepared for production deployment.
+
+Keep the interface realistic for the presentation. Do not add a visible
+"demo only" label unless the project owner asks for one. The synthetic-data
+context belongs in project documentation such as this file.
+
+PRESERVE THESE INTENDED WORKFLOW CHANGES
+----------------------------------------
+1. Borrower consent
+   Borrower consent is recorded when the borrower accepts the Terms and
+   Conditions and certifies the application information. The processing
+   screen should show that confirmation as approved and allow staff to review
+   the saved evidence.
+
+2. Co-maker consent
+   An accepted, OTP-verified co-maker approval tied to the specific loan
+   application is the co-maker's loan consent. It should count as the required
+   co-maker consent automatically; staff should not need to re-invite the
+   co-maker or manually create duplicate evidence.
+   Migration 20261112050000_count_accepted_comaker_otp_consent.sql adds this
+   behavior to the verification calculation. Confirm that it has been applied
+   to Supabase before diagnosing a remaining "0 of 1 recorded" count.
+
+3. Witness attestations
+   Show the recorded witness names in the evidence view. The names supplied
+   with the borrower's OTP-confirmed agreement are the evidence for this
+   presentation workflow; show the witness requirement as satisfied when the
+   required names are present.
+
+4. Approval workflow policy
+   This presentation does not have access to official cooperative board,
+   voting, or authorization reference numbers. Do not block the configured
+   workflow solely because those institutional references cannot be obtained.
+   Use the project workflow specification at
+   docs/approval-workflow/PROJECT_WORKFLOW_POLICY.md as the project-level
+   reference. Do not invent board resolutions, meeting minutes, or official
+   authorization numbers.
+
+5. Keep the approval sequence intact
+   Preserve the configured CRECOM and BOD review steps and the Super Admin's
+   final decision. The presentation workflow is intended to demonstrate those
+   steps, not to bypass committee approvals or fabricate approvals.
+
+6. Activation compatibility
+   The activation form uses Super Admin as the final authority to match the
+   live database function used by this project. Keep the read-only summary
+   fields read-only; policy details are edited in the draft editor. The
+   project workflow reference field and policy attestation are in the
+   activation section.
+
+DEVELOPMENT AND HANDOFF GUIDANCE
+-------------------------------
+- Read this file and docs/approval-workflow/PROJECT_WORKFLOW_POLICY.md before
+  changing consent, witness, policy activation, or application-verification
+  behavior.
+- Do not silently revert the project-level reference behavior to require
+  unavailable official cooperative references.
+- Do not weaken OTP checks, authorization checks, RLS, or unrelated security
+  controls as a shortcut. Keep the presentation-specific changes narrow.
+- Do not create fake consent, witness, or committee evidence. Evidence must
+  come from the application's recorded OTP-confirmed workflow.
+- The project owner asked to wait before pushing the latest changes to GitHub
+  until the presentation flow is confirmed. Do not push or deploy without a
+  new explicit request.
+- Check the current Git status before editing. Some presentation changes may
+  still be local and uncommitted; preserve them when making other changes.
+
+KNOWN PRESENTATION-SPECIFIC FILES
+---------------------------------
+- src/components/settings/ApprovalWorkflowPolicy.tsx
+- src/components/settings/WorkflowPolicyActivation.tsx
+- src/components/loan-applications/ProcessingRequirements.tsx
+- docs/approval-workflow/PROJECT_WORKFLOW_POLICY.md
+- supabase/migrations/20261112040000_approve_borrower_consent_and_witness_names.sql
+- supabase/migrations/20261112050000_count_accepted_comaker_otp_consent.sql
+
+This note records the project owner's intended behavior. It does not replace
+repository instructions, change production policy, or authorize deployment.
