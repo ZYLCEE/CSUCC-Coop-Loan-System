@@ -3,11 +3,16 @@ CREATE FUNCTION pg_temp.denied(command text,expected_state text) RETURNS void LA
  BEGIN EXECUTE command; EXCEPTION WHEN OTHERS THEN IF SQLSTATE=expected_state THEN RETURN; ELSE RAISE; END IF; END;
  RAISE EXCEPTION 'Expected rejection: %',command;
 END$$;
-CREATE FUNCTION pg_temp.act(action text,payload jsonb DEFAULT '{}',application text DEFAULT 'APP-VERIFY') RETURNS jsonb LANGUAGE plpgsql AS $$
+CREATE FUNCTION pg_temp.workflow_action(actor uuid,application text,action text,revision integer,state_hash text,payload jsonb,request uuid)
+RETURNS jsonb LANGUAGE sql SECURITY DEFINER SET search_path='' AS $$
+ SELECT public.application_workflow_action($1,jsonb_build_object(
+  'applicationId',$2,'operation',$3,'revision',$4,'stateHash',$5,'payload',$6,'requestId',$7))
+$$;
+CREATE FUNCTION pg_temp.act(action text,payload jsonb DEFAULT '{}',application text DEFAULT 'APP-VERIFY') RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE state jsonb;
 BEGIN
  state:=public.get_application_verification(application);
- RETURN public.mutate_application_verification(application,action,(state->>'revision')::integer,state->>'stateHash',payload,gen_random_uuid());
+ RETURN pg_temp.workflow_action(auth.uid(),application,action,(state->>'revision')::integer,state->>'stateHash',payload,gen_random_uuid());
 END$$;
 INSERT INTO auth.users(id,email,raw_app_meta_data,raw_user_meta_data) VALUES
  ('10000000-0000-0000-0000-000000000001','workflow-super@example.invalid','{"role":"super_admin","account_status":"active"}','{"full_name":"Synthetic coordinator"}'),
@@ -20,7 +25,8 @@ INSERT INTO public.members(id,user_id,member_id,first_name,last_name,membership_
  ('20000000-0000-0000-0000-000000000004','10000000-0000-0000-0000-000000000004','TEST-4','Synthetic','Co-maker','Regular');
 INSERT INTO public.loan_applications(id,application_id,member_id,member_name,loan_type,amount,status,date_submitted,tenure_months,monthly_payment) VALUES
  ('30000000-0000-0000-0000-000000000001','APP-VERIFY','20000000-0000-0000-0000-000000000003','Synthetic Borrower','Business',1000,'pending',current_date,12,100),
- ('30000000-0000-0000-0000-000000000002','APP-LEGACY','20000000-0000-0000-0000-000000000003','Synthetic Borrower','Business',1000,'approved',current_date,12,100);
+ ('30000000-0000-0000-0000-000000000002','APP-LEGACY','20000000-0000-0000-0000-000000000003','Synthetic Borrower','Business',1000,'approved',current_date,12,100),
+ ('30000000-0000-0000-0000-000000000003','APP-UNSTARTED-RETURN','20000000-0000-0000-0000-000000000003','Synthetic Borrower','Business',1000,'pending',current_date,12,100);
 INSERT INTO public.loan_documents(id,loan_application_id,user_id,kind,storage_path,original_name,content_type,size_bytes) VALUES
  ('40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000003','validId','owner/id.pdf','id.pdf','application/pdf',10),
  ('40000000-0000-0000-0000-000000000002','30000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000003','payslip','owner/payslip.pdf','payslip.pdf','application/pdf',10);
@@ -33,13 +39,26 @@ SELECT pg_temp.denied($q$INSERT INTO public.application_consent_evidence(applica
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
 SELECT pg_temp.denied($q$SELECT pg_temp.act('start','{}','APP-LEGACY')$q$,'P0001');
 DO $$
+DECLARE state jsonb; request uuid:=gen_random_uuid(); payload jsonb:='{"category":"information","reason":"Please upload the missing required documents.","affectedKinds":[]}'; result jsonb;
+BEGIN
+ state:=public.get_application_verification('APP-UNSTARTED-RETURN');
+ result:=pg_temp.workflow_action(auth.uid(),'APP-UNSTARTED-RETURN','return',0,state->>'stateHash',payload,request);
+ PERFORM pg_temp.assert_true(result->>'stage'='returned_for_requirements' AND (result->>'revision')::int=1,'return initializes and returns an unenrolled application');
+ PERFORM pg_temp.assert_true(public.get_application_verification('APP-UNSTARTED-RETURN')->>'enrolled'='true','returned application is enrolled in verification');
+ PERFORM pg_temp.assert_true(result=pg_temp.workflow_action(auth.uid(),'APP-UNSTARTED-RETURN','return',0,state->>'stateHash',payload,request),'unstarted return retry returns saved result');
+ PERFORM pg_temp.assert_true((SELECT count(*)=1 FROM public.application_workflow_events WHERE application_id='30000000-0000-0000-0000-000000000003' AND action='return'),'unstarted return is recorded once');
+ PERFORM pg_temp.assert_true((SELECT status='returned' FROM public.loan_applications WHERE application_id='APP-UNSTARTED-RETURN'),'unstarted return updates loan status');
+ PERFORM pg_temp.assert_true((SELECT count(*)=1 FROM public.application_email_outbox WHERE application_id='30000000-0000-0000-0000-000000000003'),'unstarted return queues one member email');
+END$$;
+DO $$
 DECLARE state jsonb; request uuid:=gen_random_uuid(); result jsonb;
 BEGIN
  state:=public.get_application_verification('APP-VERIFY');
- result:=public.mutate_application_verification('APP-VERIFY','start',0,state->>'stateHash','{}',request);
- PERFORM pg_temp.assert_true(result=public.mutate_application_verification('APP-VERIFY','start',0,state->>'stateHash','{}',request),'start retry returns saved result');
+ result:=pg_temp.workflow_action(auth.uid(),'APP-VERIFY','start',0,state->>'stateHash','{}',request);
+ PERFORM pg_temp.assert_true(result=pg_temp.workflow_action(auth.uid(),'APP-VERIFY','start',0,state->>'stateHash','{}',request),'start retry returns saved result');
  PERFORM pg_temp.assert_true((SELECT count(*)=1 FROM public.application_workflow_events),'enrollment is exactly once');
- PERFORM pg_temp.denied(format('SELECT public.mutate_application_verification(''APP-VERIFY'',''start'',0,%L,''{}'',%L)',state->>'stateHash',gen_random_uuid()),'40001');
+ PERFORM pg_temp.denied(format('SELECT pg_temp.workflow_action(%L::uuid,''APP-VERIFY'',''start'',0,%L,''{}'',%L::uuid)',
+   auth.uid(),state->>'stateHash',gen_random_uuid()),'40001');
 END$$;
 SELECT pg_temp.denied($q$SELECT pg_temp.act('mark_verified')$q$,'P0001');
 SELECT pg_temp.act('save_draft','{"checks":{"identity":true,"eligibility":true,"terms":true},"notes":"INTERNAL_ONLY"}');
@@ -54,9 +73,10 @@ DO $$
 DECLARE state jsonb; request uuid:=gen_random_uuid(); payload jsonb:='{"category":"documents","reason":"Please replace the blurred ID photo.","affectedKinds":["validId"]}'; result jsonb;
 BEGIN
  state:=public.get_application_verification('APP-VERIFY');
- result:=public.mutate_application_verification('APP-VERIFY','return',(state->>'revision')::int,state->>'stateHash',payload,request);
- PERFORM pg_temp.assert_true(result=public.mutate_application_verification('APP-VERIFY','return',(state->>'revision')::int,state->>'stateHash',payload,request),'correction retry does not duplicate delivery');
- PERFORM pg_temp.denied(format('SELECT public.mutate_application_verification(''APP-VERIFY'',''save_draft'',%s,%L,''{}'',%L)',state->>'revision',state->>'stateHash',gen_random_uuid()),'40001');
+ result:=pg_temp.workflow_action(auth.uid(),'APP-VERIFY','return',(state->>'revision')::int,state->>'stateHash',payload,request);
+ PERFORM pg_temp.assert_true(result=pg_temp.workflow_action(auth.uid(),'APP-VERIFY','return',(state->>'revision')::int,state->>'stateHash',payload,request),'correction retry does not duplicate delivery');
+ PERFORM pg_temp.denied(format('SELECT pg_temp.workflow_action(%L::uuid,''APP-VERIFY'',''save_draft'',%s,%L,''{}'',%L::uuid)',
+   auth.uid(),state->>'revision',state->>'stateHash',gen_random_uuid()),'40001');
 END$$;
 SELECT pg_temp.assert_true((SELECT count(*)=1 FROM public.loan_document_reviews WHERE status='needs_replacement'),'selected file is actionable in member replacement flow');
 SELECT set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000003',true);
