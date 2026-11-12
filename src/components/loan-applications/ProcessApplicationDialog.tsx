@@ -12,7 +12,7 @@ import {LoadingState} from "@/components/ui/Feedback";
 import {workflowRequest} from "@/lib/applicationWorkflowRequest";
 import {reviewRequest} from "@/lib/committeeReviewRequest";
 import {watchAdminNotifications} from "@/lib/adminNotifications";
-import {type ApplicationVerification,type VerificationChecks} from "@/lib/applicationWorkflow";
+import {displayVerificationBlocker,type ApplicationVerification,type VerificationChecks} from "@/lib/applicationWorkflow";
 import type {AdminReviewState} from "@/lib/committeeReview";
 import type {ReleasedLoan} from "@/lib/loanRelease";
 import {committeeProgress,currentProcessingStep,isLoanReleased,processingStepDescription,type ProcessingStep} from "@/lib/applicationProcessing";
@@ -141,7 +141,7 @@ export default function ProcessApplicationDialog({applicationId,onClose,onUpdate
             onUpdated={async()=>{committed.current=true;await load();setNotice("Document review saved.");}}/>
           {verification&&<p className={styles.summary+" text-support"}><CheckCircle2 className="mr-2 inline h-4 w-4 text-status-success"/>Verified by {verification.actor} · {documentDate(verification.createdAt,true)}</p>}
           {dirty&&<p role="status" className="text-caption text-portal-secondary">Save your checks before continuing.</p>}
-          {currentStep===1&&data.blockers.length>0&&<details className="rounded-lg border border-portal-border p-3"><summary className="cursor-pointer text-support font-medium">What still needs attention ({data.blockers.length})</summary><ul className="mt-3 list-disc space-y-1 pl-5 text-caption text-portal-secondary">{data.blockers.map(item=><li key={item}>{item}</li>)}</ul></details>}
+          {currentStep===1&&data.blockers.length>0&&<details className="rounded-lg border border-portal-border p-3"><summary className="cursor-pointer text-support font-medium">What still needs attention ({data.blockers.length})</summary><ul className="mt-3 list-disc space-y-1 pl-5 text-caption text-portal-secondary">{data.blockers.map(item=><li key={item}>{displayVerificationBlocker(item)}</li>)}</ul></details>}
         </>:step===5?<section className="space-y-4" aria-label="Loan release">
           <div className={styles.summary}><Badge tone={currentStep===5?"success":"neutral"}>{currentStep<5?"Upcoming":isLoanReleased(data)?"Released":"Approved — awaiting release"}</Badge><h3 className="mt-3 text-section-title font-semibold">{currentStep<5?"Release pending":isLoanReleased(data)?"Loan released":"Record loan release"}</h3><p className="mt-2 text-support text-portal-secondary">{currentStep<5?"Complete the required approvals and final decision before recording a release.":processingStepDescription(5,data,review)}</p></div>
           {review?.finalDecision?.decision==="approve"&&<p className="text-support">Approved by {review.finalDecision.actor} · {documentDate(review.finalDecision.createdAt,true)}</p>}

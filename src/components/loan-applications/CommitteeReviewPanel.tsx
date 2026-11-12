@@ -4,7 +4,7 @@ import {useCallback,useEffect,useRef,useState} from "react";
 import {reviewRequest} from "@/lib/committeeReviewRequest";
 import type {AdminReviewState,ReviewAssignment} from "@/lib/committeeReview";
 import {committeePositionLabel,signatoryPositionLabel} from "@/lib/committee";
-import {workflowStageLabels,type WorkflowStage} from "@/lib/applicationWorkflow";
+import {displayVerificationBlocker,workflowStageLabels,type WorkflowStage} from "@/lib/applicationWorkflow";
 import {CommitteeField} from "@/components/committee/CommitteeFields";
 import {Button} from "@/components/ui/Button";
 import {Input,Select,Textarea} from "@/components/ui/Fields";
@@ -37,7 +37,7 @@ export default function CommitteeReviewPanel({applicationId,onUpdated}:{applicat
   </div>}
   {data.canFinalize&&<Button variant="primary" onClick={()=>setAction({operation:"finalize"})}>Record final decision</Button>}
   {data.finalDecision&&<div className="space-y-2 rounded-lg border border-portal-border p-3 text-support"><StatusBadge status={data.finalDecision.decision==="approve"?"approved":"rejected"} /><p>{data.finalDecision.actor} · {committeeDate(data.finalDecision.createdAt)}</p><p className="whitespace-pre-wrap break-words text-portal-secondary">{data.finalDecision.reason}</p></div>}
-  {!data.verified&&!current.length&&data.blockers.length>0&&<div><p className="text-support font-medium">Needed before forwarding</p><ul className="mt-2 list-disc space-y-1 pl-5 text-caption text-portal-secondary">{data.blockers.map(item=><li key={item}>{item}</li>)}</ul></div>}
+  {!data.verified&&!current.length&&data.blockers.length>0&&<div><p className="text-support font-medium">Needed before forwarding</p><ul className="mt-2 list-disc space-y-1 pl-5 text-caption text-portal-secondary">{data.blockers.map(item=><li key={item}>{displayVerificationBlocker(item)}</li>)}</ul></div>}
   {data.cycles.map(cycle=><section key={cycle.id} className="overflow-hidden rounded-lg border border-portal-border">
    <div className="flex flex-wrap justify-between gap-2 bg-surface-muted p-3 text-support"><h4 className="font-semibold">{cycle.stage} · Cycle {cycle.cycle} · Packet v{cycle.packetVersion}</h4><span className="capitalize">{cycle.status}{cycle.outcome?" · "+cycle.outcome:""}</span></div>
    <p className="px-3 py-2 text-caption text-portal-secondary">{cycle.requiredApprovals} approvals required from {cycle.reviewerTarget} reviewers. All assigned reviewers must respond.{cycle.bodRequired?" BOD review required.":""}{cycle.routingReason?" Routing: "+cycle.routingReason:""}</p>

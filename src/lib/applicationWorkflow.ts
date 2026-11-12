@@ -14,6 +14,11 @@ export const verificationCheckLabels:Record<keyof VerificationChecks,string>={
   eligibility:"Membership eligibility and affordability checked",
   terms:"Loan amount, term and payment projection checked",
 };
+export function displayVerificationBlocker(message:string):string{
+  return message==="Required witness attestations have not been recorded for this packet."
+    ?"Required witness names have not been recorded for this packet."
+    :message;
+}
 export type WorkflowSummary={applicationId:string;stage:WorkflowStage;revision:number;stale:boolean;enrolled:boolean};
 export type VerificationDocument={id:string;kind:DocumentKind;versionId:string|null;version:number;name:string;reviewStatus:string;reviewId:string|null};
 export type ConsentEvidenceRecord={id:string;kind:"borrower"|"co_maker"|"witness";subject_reference:string;subject_name?:string;method:string;occurred_at:string;evidence_reference:string;status?:"recorded"|"approved"|"named";source?:string;relationship?:string;borrower_name?:string;amount?:number;tenure_months?:number;loan_type?:string;terms_accepted?:boolean|null;information_certified?:boolean|null;terms_version?:string|null;terms_text?:string|null};

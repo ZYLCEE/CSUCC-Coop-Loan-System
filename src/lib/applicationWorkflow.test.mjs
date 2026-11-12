@@ -4,7 +4,11 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const exports={};
 new Function('exports',ts.transpileModule(readFileSync(new URL('./applicationWorkflow.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports);
-const {emptyWorkflowPolicy,validateWorkflowPolicy,validateVerificationDraft}=exports;
+const {displayVerificationBlocker,emptyWorkflowPolicy,validateWorkflowPolicy,validateVerificationDraft}=exports;
+test('witness blockers describe the borrower-submitted names the policy counts',()=>{
+ assert.equal(displayVerificationBlocker('Required witness attestations have not been recorded for this packet.'),'Required witness names have not been recorded for this packet.');
+ assert.equal(displayVerificationBlocker('Current borrower consent evidence has not been recorded.'),'Current borrower consent evidence has not been recorded.');
+});
 test('policy starts with pending governance values and never guesses quorum or witness count',()=>{
  assert.equal(emptyWorkflowPolicy.reviewerCount,null);assert.equal(emptyWorkflowPolicy.witnessCount,null);
  assert.equal(emptyWorkflowPolicy.crecomAuthority,'pending');assert.equal(emptyWorkflowPolicy.bodMode,'pending');

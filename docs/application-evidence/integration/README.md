@@ -46,10 +46,9 @@ The admin view polls while idle in Requirements, CRECOM and BOD, and also refres
 on focus/activity notifications. It displays the saved checkboxes and accepted
 terms, co-maker approval, and borrower-supplied witness names.
 
-Witness names are labeled **Names submitted**. A name supplied by a borrower is
-not an independent witness signature or attestation; actual witness-evidence
-requirements remain enforced by the existing approved policy. No witness
-attestations or approvals are fabricated by this update.
+Borrower-supplied witness names are recorded from the OTP-confirmed application.
+The configured witness-count requirement accepts these names, and the admin UI
+labels them **Names recorded**. They are not independent witness signatures.
 
 Existing loans without saved agreements stay missing: this update cannot recover
 checkbox values or names that the older app never transmitted. It does not backfill
