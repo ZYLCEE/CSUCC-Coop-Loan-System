@@ -28,7 +28,7 @@ export default function ActiveLogsWorkspace(){
  const {role}=useAdminAuth();
  return <ActiveLogsView viewerRole={role??"admin"}/>;
 }
-export function ActiveLogsView({viewerRole}:{viewerRole:AccountRole}){
+export function ActiveLogsView({viewerRole,hideHeading=false}:{viewerRole:AccountRole;hideHeading?:boolean}){
  const ownOnly=!["admin","super_admin"].includes(viewerRole);
  const [search,setSearch]=useState(""),[debounced,setDebounced]=useState(""),[filterRole,setRole]=useState(""),[from,setFrom]=useState(""),[to,setTo]=useState(""),[page,setPage]=useState(1),[pageSize,setPageSize]=useState(10);
  const [data,setData]=useState<ActiveLogPage|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[live,setLive]=useState(false),[reload,setReload]=useState(0);
@@ -53,7 +53,7 @@ export function ActiveLogsView({viewerRole}:{viewerRole:AccountRole}){
  const reset=()=>{setPage(1);};
  const totalPages=Math.max(1,Math.ceil((data?.total??0)/pageSize)),current=data?.page??page;
  return <Card padded={false} className="min-w-0 overflow-hidden">
-  <PortalPageHeading section="active-logs"><span role="status" className="flex items-center gap-2 text-caption text-portal-secondary"><span className={styles.dot} data-live={live}/>{live?"Live updates":"Auto-refreshing"}</span></PortalPageHeading>
+  {!hideHeading&&<PortalPageHeading section="active-logs"><span role="status" className="flex items-center gap-2 text-caption text-portal-secondary"><span className={styles.dot} data-live={live}/>{live?"Live updates":"Auto-refreshing"}</span></PortalPageHeading>}{hideHeading&&<div className="flex justify-end px-4 pt-3"><span role="status" className="flex items-center gap-2 text-caption text-portal-secondary"><span className={styles.dot} data-live={live}/>{live?"Live updates":"Auto-refreshing"}</span></div>}
   <div className={styles.toolbar}>
    <label className={styles.search}>Search<span className="relative block"><Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-portal-secondary"/><Input type="search" aria-label="Search Active Logs" placeholder="Name, user, action" value={search} onChange={event=>{setSearch(event.target.value);reset();}} className="w-full pl-9"/></span></label>
    <label>Role<Select aria-label="Filter role" value={filterRole} className="w-full" onChange={event=>{setRole(event.target.value);reset();}}><option value="">{ownOnly?"My activity":"All Roles"}</option>{Object.entries(activeLogRoles).filter(([value])=>ownOnly?value===viewerRole:viewerRole==="super_admin"||value!=="super_admin").map(([value,label])=><option key={value} value={value}>{label}</option>)}</Select></label>

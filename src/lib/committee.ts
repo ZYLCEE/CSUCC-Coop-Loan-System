@@ -21,10 +21,10 @@ export type CommitteeAccount={
   creationMode?:"invite"|"password";
   committeeMemberNumber?:1|2|null;
   id:string;requestId:string;userId:string|null;name:string;email:string;role:CommitteeRole;committeeSeat:CommitteeSeat;title:string;
-  startsAt:string;endsAt:string|null;active:boolean;revision:number;setupCompletedAt:string|null;status:"invited"|"active"|"scheduled"|"expired"|"inactive"|"provisioning"|"failed"|"policy_disabled";
+  startsAt:string;endsAt:string|null;active:boolean;revision:number;setupCompletedAt:string|null;status:"invited"|"active"|"scheduled"|"expired"|"inactive"|"provisioning"|"failed"|"policy_disabled"|"blocked"|"recovery_pending";
   lastSignInAt:string|null;assignedCount:number;lastInviteAt:string|null;error:string|null;
 };
-export type CommitteeAccountsData={accounts:CommitteeAccount[];bodEnabled:boolean};
+export type CommitteeAccountsData={accounts:CommitteeAccount[];bodEnabled:boolean;accountActionsVersion?:number};
 export type CommitteeInvite={name:string;email:string;role:CommitteeRole;committeeSeat:CommitteeSeat;committeeMemberNumber:1|2|null;title:string;startsAt:string;endsAt:string|null};
 export function validateCommitteeInvite(value:unknown):CommitteeInvite{
   if(!value || typeof value!=="object" || Array.isArray(value))throw new Error("Complete the committee account details.");
@@ -55,7 +55,10 @@ export function membershipDateInput(value:string|null,inclusiveEnd=false){
   if(!value)return "";
   return new Date(Date.parse(value)+28800000-(inclusiveEnd?86400000:0)).toISOString().slice(0,10);
 }
-export type CommitteeAssignment={id:string;applicationId:string;applicant:string;memberNumber:string;loanType:string;amount:number;stage:"CRECOM"|"BOD";signatoryRole?:SignatoryRole|null;committeeMemberNumber?:1|2|null;cycle:number;packetVersion:number;assignedAt:string;dueAt:string|null;state:string;responded:number;assigned:number};
+export type CommitteeApproval={id:string;position:SignatoryRole|null;memberNumber:1|2|null;reviewer:string|null;state:string;decision:"approve"|"reject"|null;decidedAt:string|null};
+export type CommitteeApprovalProgress={approved:number;rejected:number;total:number;reviewers:CommitteeApproval[]};
+export type CommitteeConfirmation={reviewer:string;signatoryRole:SignatoryRole;committeeMemberNumber?:1|2|null;decision:string;createdAt:string;reference?:string};
+export type CommitteeAssignment={id:string;applicationId:string;applicant:string;memberNumber:string;loanType:string;amount:number;stage:"CRECOM"|"BOD";signatoryRole?:SignatoryRole|null;committeeMemberNumber?:1|2|null;cycle:number;packetVersion:number;assignedAt:string;dueAt:string|null;state:string;responded:number;assigned:number;approvalProgress?:CommitteeApprovalProgress;myDecision?:"approve"|"reject"|null;crecomConfirmations?:CommitteeConfirmation[]};
 export type CommitteeDecision={id:string;assignmentId:string;applicationId:string;cycle:number;packetVersion:number;decision:string;signatoryRole?:SignatoryRole|null;reason:string|null;createdAt:string;accessAvailable?:boolean};
 export type CommitteeWorkspace={assignments:CommitteeAssignment[];history:CommitteeDecision[];counts:{assigned:number;pending:number;waiting:number;clarification:number;completed:number};};
 export type CommitteePacket={assignment:CommitteeAssignment;summary:Record<string,unknown>;findings:string;consentSummary:string;documents:{documentId:string;versionId:string|null;kind:string;name:string}[]};

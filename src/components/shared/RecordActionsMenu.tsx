@@ -11,9 +11,12 @@ interface RecordActionsMenuProps {
   onPayment?: () => void;
   onRepayments?: () => void;
   canRecordPayment?: boolean;
+  viewLabel?: string;
+  additionalActions?: {label:string;onSelect:()=>void}[];
+  overlayClassName?: string;
 }
 
-export default function RecordActionsMenu({ label, onView, onPayment, onRepayments, canRecordPayment = false }: RecordActionsMenuProps) {
+export default function RecordActionsMenu({ label, onView, onPayment, onRepayments, canRecordPayment = false, viewLabel="View details", additionalActions=[], overlayClassName="z-[70]" }: RecordActionsMenuProps) {
   const menuId = useId();
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
@@ -49,7 +52,7 @@ export default function RecordActionsMenu({ label, onView, onPayment, onRepaymen
   const openMenu = () => {
     if (trigger.current) {
       anchorBounds.current = trigger.current.getBoundingClientRect();
-      setPosition(recordMenuPosition(trigger.current, 200, 12 + (1 + Number(!!onPayment) + Number(!!onRepayments)) * 36));
+      setPosition(recordMenuPosition(trigger.current, 200, 12 + (1 + additionalActions.length + Number(!!onPayment) + Number(!!onRepayments)) * 36));
     }
   };
 
@@ -69,10 +72,11 @@ export default function RecordActionsMenu({ label, onView, onPayment, onRepaymen
     </button>
     {position && createPortal(<div ref={menu} id={menuId} role="menu" aria-label={`Actions for ${label}`}
       onKeyDown={event => navigateRecordMenu(event, () => { setPosition(null); trigger.current?.focus({ preventScroll: true }); })}
-      style={position} className="ui-card fixed z-[70] w-[200px] overflow-y-auto p-1 shadow-portal-dropdown">
+      style={position} className={`ui-card fixed ${overlayClassName} w-[200px] overflow-y-auto p-1 shadow-portal-dropdown`}>
       <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onView)} className={itemClass}>
-        <Eye className="h-4 w-4" aria-hidden="true" />View details
+        <Eye className="h-4 w-4" aria-hidden="true" />{viewLabel}
       </button>
+      {additionalActions.map(action=><button key={action.label} type="button" role="menuitem" tabIndex={-1} onClick={()=>select(action.onSelect)} className={itemClass}><History className="h-4 w-4" aria-hidden="true"/>{action.label}</button>)}
       {onRepayments && <button type="button" role="menuitem" tabIndex={-1} onClick={() => select(onRepayments)} className={itemClass}>
         <History className="h-4 w-4" aria-hidden="true" />Repayment details
       </button>}

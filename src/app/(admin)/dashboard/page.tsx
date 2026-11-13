@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarDays, ChevronDown } from "lucide-react";
 import { usePathname } from "next/navigation";
+import {loanTypeLabel,loanTypeOptions} from "@/lib/loanTypes";
 import DashboardMetrics from "@/components/dashboard/DashboardMetrics";
 import ChartsSection from "@/components/dashboard/ChartsSection";
 import RecentApplications from "@/components/dashboard/RecentApplications";
@@ -17,15 +18,15 @@ import PortalPageHeading from "@/components/shared/PortalPageHeading";
 export default function DashboardPage() {
   const pathname = usePathname();
   const [period, setPeriod] = useState<ReportingPeriod>("this-month");
-  const { loans, activeMembers } = useDashboardData();
+  const range = getReportRange(period);
+  const { loans, activeMembers, financials, connected } = useDashboardData(range);
   const { finish } = useLoginTransition();
   const dashboardReady = !loans.loading && !activeMembers.loading;
 
   useEffect(() => {
     if (dashboardReady) finish();
   }, [dashboardReady, finish]);
-  const range = useMemo(() => getReportRange(period), [period]);
-  const filterOptions = useMemo(() => {
+  const filterOptions = (() => {
     const now = new Date();
     return ([
       { value: "this-month", label: "This Month" },
@@ -35,9 +36,9 @@ export default function DashboardPage() {
       const optionRange = getReportRange(option.value, now);
       return { ...option, dateLabel: option.value === "this-year" ? optionRange.start.slice(0, 4) : optionRange.label };
     });
-  }, []);
+  })();
   const summary = useMemo(() => loans.data ? summarizeLoans(loans.data, range) : null, [loans.data, range]);
-  const loanTypes = useMemo(() => loans.data ? getLoanTypeDistribution(loans.data) : undefined, [loans.data]);
+  const loanTypes = useMemo(() => loans.data ? getLoanTypeDistribution(loans.data.map(loan=>({...loan,type:loanTypeLabel(loan.type)})), range, loanTypeOptions(loans.data.map(loan=>loan.type))) : undefined, [loans.data,range]);
   const prefix = pathname.startsWith("/super-admin/") ? "/super-admin"
     : pathname.startsWith("/admin/") ? "/admin" : "";
 
@@ -58,11 +59,12 @@ export default function DashboardPage() {
       </div>
       </PortalPageHeading>
       <div className="ui-card-padding min-w-0 space-y-portal-section">
-      <DashboardMetrics pending={summary?.pending ?? null} activeMembers={activeMembers.data}
-        disbursement={summary?.disbursement ?? null} period={period}
-        loansLoading={loans.loading} membersLoading={activeMembers.loading}
-        loansError={loans.error} membersError={activeMembers.error}
-        retryLoans={loans.retry} retryMembers={activeMembers.retry} />
+      {!connected&&<p role="status" className="text-support text-status-warning">Live updates interrupted. Reconnecting. Data is checked automatically; you can retry any unavailable report.</p>}
+      <DashboardMetrics pending={financials.data?.pending ?? null} activeMembers={activeMembers.data}
+        collections={financials.data?.collections ?? null} disbursement={financials.data?.disbursement ?? null} period={period}
+        financialsLoading={financials.loading} membersLoading={activeMembers.loading}
+        financialsError={financials.error} membersError={activeMembers.error}
+        retryFinancials={financials.retry} retryMembers={activeMembers.retry} />
       <ChartsSection data={summary?.trends} loanTypes={loanTypes} loading={loans.loading} error={loans.error}
         periodLabel={range.label} approvalDatesMissing={summary?.approvalDatesMissing} onRetry={loans.retry} />
       <RecentApplications applications={summary?.recent} loading={loans.loading} error={loans.error}

@@ -8,20 +8,39 @@ export const workflowStageLabels:Record<WorkflowStage,string> = {
   crecom_review:"CRECOM review",bod_review:"BOD review",review_attention:"Review needs attention",review_stale:"Packet needs re-verification",
   ready_for_bod:"Ready for BOD",ready_for_final:"Awaiting final authority",final_approved:"Final approval recorded",final_rejected:"Final rejection recorded",
 };
+export function workflowStagePresentation(stage:WorkflowStage,stale:boolean){
+  return {label:workflowStageLabels[stale?"review_stale":stage],staleNotice:stale?"The recorded review packet is stale and requires re-verification.":null};
+}
 export type VerificationChecks={identity:boolean;eligibility:boolean;terms:boolean};
 export const verificationCheckLabels:Record<keyof VerificationChecks,string>={
   identity:"Member identity and application details checked",
   eligibility:"Membership eligibility and affordability checked",
   terms:"Loan amount, term and payment projection checked",
 };
+const verificationCheckBlockers:Record<keyof VerificationChecks,string>={
+  identity:"Complete the identity and application details check.",
+  eligibility:"Complete the membership eligibility and affordability check.",
+  terms:"Complete the loan terms and payment projection check.",
+};
+export function remainingVerificationBlockers(blockers:string[],checks:VerificationChecks):string[]{
+  const resolved=new Set((Object.keys(checks) as (keyof VerificationChecks)[]).filter(key=>checks[key]).map(key=>verificationCheckBlockers[key]));
+  return blockers.filter(blocker=>!resolved.has(blocker));
+}
 export function displayVerificationBlocker(message:string):string{
   return message==="Required witness attestations have not been recorded for this packet."
     ?"Required witness names have not been recorded for this packet."
     :message;
 }
 export type WorkflowSummary={applicationId:string;stage:WorkflowStage;revision:number;stale:boolean;enrolled:boolean};
+export function workflowStageLabel(summary:WorkflowSummary|undefined,loanStatus:string):string|undefined{
+  if(summary)return workflowStagePresentation(summary.stage,summary.stale).label;
+  const status=loanStatus.trim().toLowerCase().replaceAll("_"," ");
+  if(status==="returned")return workflowStageLabels.returned_for_requirements;
+  if(status==="pending")return workflowStageLabels.not_started;
+  return undefined;
+}
 export type VerificationDocument={id:string;kind:DocumentKind;versionId:string|null;version:number;name:string;reviewStatus:string;reviewId:string|null};
-export type ConsentEvidenceRecord={id:string;kind:"borrower"|"co_maker"|"witness";subject_reference:string;subject_name?:string;method:string;occurred_at:string;evidence_reference:string;status?:"recorded"|"approved"|"named";source?:string;relationship?:string;borrower_name?:string;amount?:number;tenure_months?:number;loan_type?:string;terms_accepted?:boolean|null;information_certified?:boolean|null;terms_version?:string|null;terms_text?:string|null};
+export type ConsentEvidenceRecord={id:string;kind:"borrower"|"co_maker"|"witness";subject_reference:string;subject_name?:string;method:string;occurred_at:string;evidence_reference:string;status?:"recorded"|"approved"|"named"|"pending"|"declined"|"expired"|"invalidated";decision_reason?:string|null;source?:string;relationship?:string;borrower_name?:string;amount?:number;tenure_months?:number;loan_type?:string;terms_accepted?:boolean|null;information_certified?:boolean|null;terms_version?:string|null;terms_text?:string|null};
 export type WorkflowPolicyConfig={
   reviewerCount:number|null;quorumRule:string;crecomAuthority:"pending"|"recommendation"|"binding_decision";
   bodMode:"pending"|"none"|"conditional"|"required";bodCriteria:string;finalAuthority:string;
@@ -44,7 +63,7 @@ export type ApplicationVerification={
   checks:VerificationChecks;notes:string;documents:VerificationDocument[];requiredKinds:DocumentKind[];
   policy:WorkflowPolicy|null;blockers:string[];evidence:{borrower:number;coMaker:number;witnesses:number};
   history:WorkflowEvent[];lastReturned:{reason:string;category:string;createdAt:string}|null;
-  loanSummary?:{amount:number;months:number;monthlyPayment:number;purpose:string};returnEmailStatus?:string|null;
+  loanSummary?:{amount:number;months:number;monthlyPayment:number;purpose:string};returnEmailStatus?:string|null;emailDelivery?:{queued:number;sent:number;failed:number}|null;
   permissions:{verify:boolean;return:boolean;policyManage:boolean};canEnroll:boolean;
 };
 export type WorkflowPolicyList={policies:WorkflowPolicy[];canManage:boolean};

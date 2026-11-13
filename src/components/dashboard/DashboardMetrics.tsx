@@ -6,12 +6,13 @@ interface DashboardMetricsProps {
   pending: number | null;
   activeMembers: number | null;
   disbursement: number | null;
+  collections: number | null;
   period: ReportingPeriod;
-  loansLoading: boolean;
+  financialsLoading: boolean;
   membersLoading: boolean;
-  loansError: string | null;
+  financialsError: string | null;
   membersError: string | null;
-  retryLoans: () => void;
+  retryFinancials: () => void;
   retryMembers: () => void;
 }
 
@@ -22,24 +23,27 @@ export default function DashboardMetrics(props: DashboardMetricsProps) {
     <section aria-label="Portfolio statistics" className="grid grid-cols-1 gap-4 md:grid-cols-2 min-[75rem]:grid-cols-4">
       <StatCard icon={Clock} iconBgColor="var(--status-warning-surface)" iconColor="var(--status-warning)"
         label="Pending Applications" value={props.pending?.toLocaleString("en-PH") ?? "—"}
-        subtitle="Awaiting review" loading={props.loansLoading}
-        unavailable={props.loansError ? "Application count unavailable" : undefined}
-        onRetry={props.loansError ? props.retryLoans : undefined} />
+        subtitle="Awaiting initial staff review" loading={props.financialsLoading}
+        unavailable={props.financialsError ? "Application count unavailable" : undefined}
+        onRetry={props.financialsError ? props.retryFinancials : undefined} />
       <StatCard icon={Users} iconBgColor="var(--status-info-surface)" iconColor="var(--status-info)"
         label="Active Members" value={props.activeMembers?.toLocaleString("en-PH") ?? "—"}
         subtitle="Registered active members" loading={props.membersLoading}
         unavailable={props.membersError ? "Member count unavailable" : undefined}
         onRetry={props.membersError ? props.retryMembers : undefined} />
       <StatCard icon={TrendingUp} iconBgColor="var(--status-success-surface)" iconColor="var(--status-success)"
-        label={yearly ? "Year-to-Date Collections" : "Monthly Collections"} value="—"
+        label={yearly ? "Year-to-Date Collections" : "Monthly Collections"}
+        value={props.collections === null ? "—" : formatPeso(props.collections)}
         subtitle={`Payments collected ${when}`}
-        unavailable="Confirmed collections unavailable" />
+        loading={props.financialsLoading}
+        unavailable={props.financialsError ? "Confirmed collections unavailable" : undefined}
+        onRetry={props.financialsError ? props.retryFinancials : undefined} />
       <StatCard icon={Wallet} iconBgColor="var(--status-neutral-surface)" iconColor="var(--coop-primary)"
-        label={yearly ? "Year-to-Date Disbursement" : "Monthly Disbursement"}
+        label={yearly ? "Year-to-Date Net Disbursements" : "Monthly Net Disbursements"}
         value={props.disbursement === null ? "—" : formatPeso(props.disbursement)}
-        subtitle={`Loans released ${when}`} loading={props.loansLoading}
-        unavailable={!props.loansLoading && props.disbursement === null ? "Verified release totals unavailable" : undefined}
-        onRetry={props.loansError ? props.retryLoans : undefined} />
+        subtitle={`Loans released ${when}`} loading={props.financialsLoading}
+        unavailable={!props.financialsLoading && props.disbursement === null ? "Verified release totals unavailable" : undefined}
+        onRetry={props.financialsError ? props.retryFinancials : undefined} />
     </section>
   );
 }

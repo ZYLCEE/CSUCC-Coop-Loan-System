@@ -207,7 +207,7 @@ body {
 
 .coop-header-inner.coop-letterhead {
   display: grid;
-  grid-template-columns: clamp(112px, 14vw, 220px) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(270px, 1fr) minmax(0, 2.8fr) minmax(270px, 1fr);
   align-items: center;
   gap: 16px;
   width: 100%;
@@ -312,20 +312,21 @@ body {
 }
 
 @media (900px <= width < 1200px) {
-  .coop-header-inner.coop-letterhead { grid-template-columns: 108px minmax(0, 1fr) auto; gap: 12px; }
+  .coop-header-inner.coop-letterhead { grid-template-columns: 88px minmax(0,1fr) 88px; gap: 12px; }
+  .coop-portal-utilities { grid-column: 1 / -1; justify-self: center; }
   .admin-portal-shell > .coop-portal-header { padding-inline: 16px; }
   .coop-letterhead-name { font-size: 17px; }
   .coop-date-pill { padding-inline: 8px; font-size: 11px; }
 }
 
 @media (width < 900px) {
-  .coop-header-inner.coop-letterhead { grid-template-columns: 80px minmax(0, 1fr); gap: 6px 12px; }
+  .coop-header-inner.coop-letterhead { grid-template-columns: 80px minmax(0, 1fr) 80px; gap: 6px 12px; }
   .coop-letterhead-seal { width: 80px; height: 80px; }
   .coop-portal-utilities { grid-column: 1 / -1; justify-self: center; }
 }
 
 @media (width < 640px) {
-  .coop-header-inner.coop-letterhead { grid-template-columns: 64px minmax(0, 1fr); gap: 6px 8px; }
+  .coop-header-inner.coop-letterhead { grid-template-columns: minmax(0,1fr); gap: 6px 8px; }
   .coop-letterhead-seal { width: 64px; height: 64px; }
   .coop-letterhead-name { font-size: 14px; line-height: 1.2; }
   .coop-letterhead-contact, .coop-letterhead-registration { font-size: 10px; }

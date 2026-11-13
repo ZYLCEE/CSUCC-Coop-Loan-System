@@ -1,0 +1,3 @@
+const loans=Array.from({length:7},(_,i)=>({id:"APP-TEST-"+(i+1),member:"Synthetic Member "+(i+1),memberId:"TEST-"+(i+1),membershipType:"regular",type:i%2?"Emergency":"Regular",amount:1000,status:"Pending",submittedAt:"2026-11-"+String(i+1).padStart(2,"0"),approvedAt:null,releasedAt:null,createdAt:`2026-11-${String(i+1).padStart(2,"0")}T02:00:00Z`}));
+export const useLoginTransition=()=>({finish:()=>{}});
+export const useDashboardData=()=>({loans:{data:loans,loading:false,error:null,retry:()=>{}},activeMembers:{data:8,loading:false,error:null,retry:()=>{}},financials:{data:{pending:7,collections:1234.50,disbursement:930},loading:false,error:null,retry:()=>{}},connected:true});

@@ -17,7 +17,7 @@ export default function ChartsSection({ loanTypes, ...props }: ChartsSectionProp
   return (
     <div role="group" aria-label="Dashboard charts" className="grid min-w-0 grid-cols-1 items-stretch gap-4 min-[75rem]:grid-cols-[minmax(0,13fr)_minmax(0,7fr)]">
       <BarChartCard {...props} />
-      <DonutChartCard distribution={loanTypes} loading={props.loading} error={props.error} onRetry={props.onRetry} />
+      <DonutChartCard periodLabel={props.periodLabel} distribution={loanTypes} loading={props.loading} error={props.error} onRetry={props.onRetry} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import { Input, Select } from "@/components/ui/Fields";
 import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowLeft, Bell, Check, CheckCheck, CircleAlert, FileCheck, RefreshCw, Search, Wallet, X } from "lucide-react";
 import { notificationCategoryOptions, notificationHref, notificationRelativeTime, type NotificationCategory } from "@/lib/adminNotifications";
 import { useNotificationInbox } from "./useNotificationInbox";
@@ -109,7 +110,8 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
 
   const content = <>
           <div className="shrink-0 border-b border-portal-border p-3 sm:px-4">
-            {!expanded && <div className="flex items-start justify-between gap-3">
+            {expanded&&<nav aria-label="Communication tools" className="flex flex-wrap justify-center gap-2 border-t border-portal-border p-3"><Link className={actionButtonStyles()} href={`${routePrefix}/${routePrefix?"communication":"notifications"}`}>Activity Inbox & Member Messages</Link><Link className={actionButtonStyles()} href={`${routePrefix}/announcements`}>Announcements</Link></nav>}
+          {!expanded && <div className="flex items-start justify-between gap-3">
               <div>
                 <h2 id={`${panelId}-title`} className="text-card-title">{expanded ? "Notification Center" : "Notifications"}</h2>
                 <p className="mt-1 text-caption text-portal-secondary">{inbox.unreadCount === null ? inbox.loading ? "Checking unread notifications…" : "Unread count unavailable" : `${inbox.unreadCount.toLocaleString()} unread`}</p>
@@ -159,7 +161,7 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
                         else if (!expanded) expandCenter();
                       }} className={`block w-full rounded-portal-control text-start hover:text-coop-primary ${focusStyle}`}>
                         <span className="flex items-start gap-2"><span className={`min-w-0 flex-1 text-support [overflow-wrap:anywhere] ${notification.read ? "font-medium" : "font-semibold"}`}>{notification.title}</span>{!notification.read && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-coop-dashboard-green" role="img" aria-label="Unread" />}</span>
-                        <span className={`mt-1 block whitespace-pre-wrap text-caption text-portal-muted [overflow-wrap:anywhere] ${expanded ? "" : "line-clamp-3"}`}>{notification.message}</span>
+                        <span className={`mt-1 block whitespace-pre-wrap text-caption text-portal-muted [overflow-wrap:anywhere] ${expanded ? "" : "line-clamp-3"}`}>{notification.message}</span>{notification.actorName&&<span className="mt-1 block text-caption text-portal-secondary">{notification.actorName}{notification.actorRole?"  -  "+notification.actorRole.replaceAll("_"," "):""}</span>}<span className="mt-1 block text-caption font-semibold text-coop-dashboard-green">View Details</span>
                       </button>
                       <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2">
                         <time dateTime={notification.createdAt} title={new Date(notification.createdAt).toLocaleString("en-PH", { timeZone: "Asia/Manila" })} className="text-caption text-portal-secondary">{notificationRelativeTime(notification.createdAt, now)}</time>
@@ -172,6 +174,7 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
               ))}</ul>}
             {!inbox.loading && !inbox.error && inbox.hasMore && <div className="px-4 py-3 text-center"><Button size="compact" loading={inbox.loadingMore} disabled={inbox.busy} onClick={() => void inbox.loadMore()}>{inbox.loadingMore ? "Loading…" : "Load more notifications"}</Button></div>}
           </div>
+          {expanded&&<nav aria-label="Communication tools" className="flex flex-wrap justify-center gap-2 border-t border-portal-border p-3"><Link className={actionButtonStyles()} href={`${routePrefix}/${routePrefix?"communication":"notifications"}`}>Activity Inbox & Member Messages</Link><Link className={actionButtonStyles()} href={`${routePrefix}/announcements`}>Announcements</Link></nav>}
           {!expanded && <div className="flex shrink-0 justify-center border-t border-portal-border p-3"><Button onClick={expandCenter}>View All Notifications</Button></div>}
   </>;
   return (
@@ -184,7 +187,7 @@ export default function NotificationPopover({ userId, routePrefix }: { userId: s
         }}
         className={`relative flex size-control-compact shrink-0 items-center justify-center rounded-full border border-portal-border bg-surface-card text-portal-secondary transition-colors hover:border-coop-dashboard-green hover:bg-surface-page hover:text-coop-dashboard-green ${focusStyle}`}>
         <Bell className="size-icon-compact" aria-hidden="true" />
-        {inbox.unreadCount !== null && inbox.unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-surface-card bg-coop-dashboard-green px-0.5 text-caption font-bold leading-none text-white">{inbox.unreadCount > 99 ? "99+" : inbox.unreadCount}</span>}
+        {inbox.unreadCount !== null && inbox.unreadCount > 0 && <span aria-hidden="true" className="absolute -right-1.5 -top-1.5 flex min-h-5 min-w-5 items-center justify-center rounded-full border-2 border-surface-card bg-status-danger px-0.5 text-caption font-bold leading-none text-white">{inbox.unreadCount > 99 ? "99+" : inbox.unreadCount}</span>}
       </button>
       <span id={`${panelId}-count`} className="sr-only">{inbox.unreadCount === null ? "Unread notification count unavailable" : `${inbox.unreadCount} unread notifications`}</span>
       {open && (expanded ? <ActionDialog title="Notification Center" icon={Bell} returnFocusRef={bell} className="max-w-[720px]" onClose={() => close(true)}

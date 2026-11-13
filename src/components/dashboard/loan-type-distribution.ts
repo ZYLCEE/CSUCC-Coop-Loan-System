@@ -1,3 +1,4 @@
+import type {ReportRange} from "./dashboard-model";
 import type { DashboardLoan } from "./dashboard-model";
 
 export interface LoanTypeSlice {
@@ -26,14 +27,16 @@ function categoryColor(name: string): string {
 }
 
 export function getLoanTypeDistribution(
-  loans: Pick<DashboardLoan, "id" | "type" | "status">[],
+  loans: (Pick<DashboardLoan, "id" | "type" | "status"> & {submittedAt?:string})[],
+  range?: ReportRange,
+  categories:readonly string[]=[],
 ): LoanTypeDistribution {
   const active = [...new Map(loans.map((loan) => [loan.id, loan])).values()]
-    .filter((loan) => activeStatuses.has(loan.status));
+    .filter((loan) => range ? !!loan.submittedAt&&loan.submittedAt>=range.start&&loan.submittedAt<range.end : activeStatuses.has(loan.status));
   if (active.some((loan) => !loan.type.trim())) {
     return { total: active.length, types: [], unavailable: true };
   }
-  const counts = new Map<string, number>();
+  const counts = new Map<string, number>(range?categories.map(type=>[type,0]):[]);
   for (const loan of active) {
     const name = loan.type.trim();
     counts.set(name, (counts.get(name) ?? 0) + 1);
@@ -42,7 +45,7 @@ export function getLoanTypeDistribution(
     total: active.length,
     unavailable: false,
     types: [...counts].sort(([first], [second]) => first.localeCompare(second)).map(([name, count]) => ({
-      name, count, percentage: count / active.length * 100, color: categoryColor(name),
+      name, count, percentage: active.length?count / active.length * 100:0, color: categoryColor(name),
     })),
   };
 }

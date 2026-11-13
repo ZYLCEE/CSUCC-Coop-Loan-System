@@ -130,7 +130,7 @@ export async function markAllAdminNotificationsRead(userId: string): Promise<voi
 
 export function notificationHref(type: string, prefix: string,context?:Pick<AdminNotification,"entityType"|"entityKey">): string | null {
   const destinations:Record<string,string>={application:"loan-applications",applications:"loan-applications",active_loan:"active-loans",member:"all-accounts",accounts:"all-accounts",documents:"documents",announcements:"announcements",system:"settings",assignment:"loan-applications"};
-  if(context?.entityType&&destinations[context.entityType])return prefix+"/"+destinations[context.entityType];
+  if(context?.entityType&&destinations[context.entityType])return prefix+"/"+destinations[context.entityType]+(["application","applications","assignment"].includes(context.entityType)&&context.entityKey&&/^[A-Za-z0-9_-]{1,100}$/.test(context.entityKey)?"?application="+encodeURIComponent(context.entityKey):"");
   if (loanNotificationTypes.includes(type)) return `${prefix}/loan-applications`;
   if (type === "payment_reminder") return `${prefix}/active-loans`;
   return null;

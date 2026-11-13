@@ -3,6 +3,7 @@ import {committeeFailure,committeeReply,checkCommitteeError,committeeSession,Com
 import {getCommitteeRole} from "@/lib/committee";
 import {validatePasswordChange} from "@/lib/profileModel";
 import {updateCommitteeAuthUser} from "@/lib/committeeAuthUpdate";
+import {withCommitteeApprovalProgress} from "@/lib/committeeProgressServer";
 
 export async function GET(request:Request){
  try{
@@ -12,14 +13,17 @@ export async function GET(request:Request){
   }
   if(!getCommitteeRole(user))throw new CommitteeError("Active committee membership is required.",403);
   if(operation==="workspace"){
-   const result=await session.rpc("committee_workspace");checkCommitteeError(result.error);return committeeReply(result.data);
+   const result=await session.rpc("committee_workspace");checkCommitteeError(result.error);
+   return committeeReply({...result.data,assignments:await withCommitteeApprovalProgress(committeeServiceClient(request),result.data.assignments)});
   }
   if(operation==="inbox"){
    const result=await session.rpc("committee_inbox");checkCommitteeError(result.error);return committeeReply(result.data);
   }
   const id=params.get("assignmentId");if(!validCommitteeUuid(id))throw new CommitteeError("Choose an assigned application.");
   if(operation==="packet"){
-   const result=await session.rpc("committee_review_packet",{p_assignment_id:id});checkCommitteeError(result.error);return committeeReply(result.data);
+   const result=await session.rpc("committee_review_packet",{p_assignment_id:id});checkCommitteeError(result.error);
+   const [assignment]=await withCommitteeApprovalProgress(committeeServiceClient(request),[result.data.assignment]);
+   return committeeReply({...result.data,assignment,...(assignment.stage==="BOD"?{crecomConfirmations:assignment.crecomConfirmations??[],canRespond:result.data.canRespond===true&&assignment.crecomConfirmations?.length===3}:{})});
   }
   if(operation==="file"){
    const documentId=params.get("documentId"),versionId=params.get("versionId");

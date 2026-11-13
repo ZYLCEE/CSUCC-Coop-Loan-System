@@ -32,8 +32,8 @@ export async function checkPortalBranding({browser,url}){
     const items=await header.locator('.coop-letterhead-copy p,.coop-letterhead-seal,.coop-portal-utilities').all();
     for(const item of items){const box=await item.boundingBox();assert.ok(box.x>=bounds.x-1&&box.x+box.width<=bounds.x+bounds.width+1&&box.y>=bounds.y-1&&box.y+box.height<=bounds.y+bounds.height+1,'Every letterhead detail must fit.');}
     await page.getByRole('button',{name:'Open notifications',exact:true}).waitFor();
-    assert.equal(await page.getByRole('complementary',{name:'CSUCC MPC sidebar'}).locator('img').count(),0,'The sidebar seal must be removed.');
-    const account=await page.getByRole('group',{name:'Signed-in account'}).boundingBox(),mainLabel=await page.getByRole('heading',{name:'MAIN',exact:true}).boundingBox();
+    assert.equal(await page.getByRole('complementary',{name:'CSUCC ERMPC sidebar'}).locator('img').count(),0,'The sidebar seal must be removed.');
+    const account=await page.getByRole('group',{name:'Signed-in account'}).boundingBox(),mainLabel=await page.getByRole('heading',{name:'OVERVIEW',exact:true}).boundingBox();
     if(mainLabel)assert.ok(account.y+account.height<=mainLabel.y,'Account identity stays above MAIN.');
     const watermark=await checkWatermark(page);
     if(bounds.width>1100){assert.ok(bounds.height<=110,'Desktop header stays compact.');assert.ok(watermark.width>=550,'Desktop watermark is larger.');}
@@ -88,7 +88,7 @@ export async function checkPortalBranding({browser,url}){
     const box=await nav.boundingBox(),body=await mobile.locator('main.portal-content').boundingBox();assert.ok(body.y>=box.y+box.height-1);
     assert.equal(await mobile.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
     await mobile.getByRole('button',{name:'Open notifications',exact:true}).waitFor();
-    if(width>=900){
+    if(width>=1200){
       const seal=await nav.locator('.coop-letterhead-seal').boundingBox(),tools=await nav.locator('.coop-portal-utilities').boundingBox();
       assert.ok(Math.abs(seal.y+seal.height/2-tools.y-tools.height/2)<1,'Date and bell stay on the logo row at '+width+'px.');
     }

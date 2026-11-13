@@ -4,7 +4,28 @@ import {readFileSync} from 'node:fs';
 import ts from 'typescript';
 const exports={};
 new Function('exports',ts.transpileModule(readFileSync(new URL('./applicationWorkflow.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText)(exports);
-const {displayVerificationBlocker,emptyWorkflowPolicy,validateWorkflowPolicy,validateVerificationDraft}=exports;
+const {displayVerificationBlocker,emptyWorkflowPolicy,validateWorkflowPolicy,validateVerificationDraft,workflowStageLabels,workflowStagePresentation,workflowStageLabel}=exports;
+test('workflow stage labels distinguish verification, committee, final decision and rejection states',()=>{
+ assert.equal(workflowStageLabels.not_started,'Verification not started');
+ assert.equal(workflowStageLabels.crecom_review,'CRECOM review');
+ assert.equal(workflowStageLabels.bod_review,'BOD review');
+ assert.equal(workflowStageLabels.ready_for_final,'Awaiting final authority');
+ assert.equal(workflowStageLabels.final_rejected,'Final rejection recorded');
+});
+test('stale workflow packets show re-verification rather than an unqualified stage',()=>{
+ assert.deepEqual(workflowStagePresentation('ready_for_committee',true),{
+ label:'Packet needs re-verification',
+ staleNotice:'The recorded review packet is stale and requires re-verification.',
+ });
+ assert.deepEqual(workflowStagePresentation('ready_for_committee',false),{label:'Ready to forward',staleNotice:null});
+});
+test('unstarted returned applications receive an accurate table stage without inventing verification',()=>{
+ assert.equal(workflowStageLabel(undefined,'Returned'),'Returned for requirements');
+ assert.equal(workflowStageLabel(undefined,'Pending'),'Verification not started');
+ assert.equal(workflowStageLabel(undefined,'Approved'),undefined);
+ assert.equal(workflowStageLabel({applicationId:'APP-1',stage:'crecom_review',revision:1,stale:false,enrolled:true},'Pending'),'CRECOM review');
+ assert.equal(workflowStageLabel({applicationId:'APP-2',stage:'ready_for_committee',revision:2,stale:true,enrolled:true},'Pending'),'Packet needs re-verification');
+});
 test('witness blockers describe the borrower-submitted names the policy counts',()=>{
  assert.equal(displayVerificationBlocker('Required witness attestations have not been recorded for this packet.'),'Required witness names have not been recorded for this packet.');
  assert.equal(displayVerificationBlocker('Current borrower consent evidence has not been recorded.'),'Current borrower consent evidence has not been recorded.');

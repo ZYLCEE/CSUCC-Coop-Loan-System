@@ -11,11 +11,14 @@ are unchanged. Removed widgets remain available as source components.
 - `StatCard.tsx`, `DashboardMetrics.tsx`: the four responsive KPI cards, skeletons,
   real zero values and explicit unavailable/retry states.
 - `ChartsSection.tsx`, `BarChartCard.tsx`, `DonutChartCard.tsx`: the 65%/35%
-  desktop chart row, monthly application bars and current loan-type donut.
+  desktop chart row, monthly application bars and loan-type counts for the
+  selected reporting period.
   Charts stack below 1200px; desktop card heights and heading positions match.
-- `loan-type-distribution.ts`: current active-loan counts, percentages and stable
-  category colors derived from real loan records, with no extra API request.
-- `RecentApplications.tsx`: the seven-column table of five latest applications.
+- `loan-type-distribution.ts`: selected-period application counts, percentages
+  and stable category colors derived from real loan records, with no extra API
+  request.
+- `RecentApplications.tsx`: the shared eight-column table of five latest
+  applications, with a read-only details action.
 - `dashboard-data.ts`, `dashboard-model.ts`, `useDashboardData.ts`: dashboard-only
   queries, validated aggregation, calendar ranges and shared request lifecycle.
 - `dashboard-model.test.mjs`, `dashboard-data.test.mjs`,
@@ -33,11 +36,17 @@ are unchanged. Removed widgets remain available as source components.
   trusted role and account-status resolution. It counts distinct, linked active
   Member authentication IDs, excluding administrative and unlinked/deleted users.
   The count is unavailable if that service cannot be reached or is not deployed.
-- Monthly Disbursement sums principal amounts in integer centavos for records in
-  `released`, `completed` or `overdue` with `date_released` in the reporting period.
-  This follows the existing one-time, full-principal release workflow; approval
-  alone never counts. A released loan without its release date makes this total
-  unavailable, rather than undercounting an unknown reporting period.
+- Monthly Net Disbursements sums recorded release principal less the recorded
+  processing and service fees for records in `released`, `completed` or `overdue`
+  with `date_released` in the reporting period. This follows the existing
+  one-time release workflow; approval alone never counts. A released loan without
+  its release date or fee snapshots makes the total unavailable rather than
+  undercounting an unknown reporting period.
+- Monthly Collections uses the reporting function's sum of `loan_payments`
+  recorded as `posted` during the selected period. Reversals change the payment
+  status to `reversed`, so they are excluded. The Dashboard renders the confirmed
+  total returned by that function; if reporting data is unavailable, it shows a
+  dash and Retry instead of displaying zero.
 - Trends bucket `date_submitted` and `date_approved` separately. A loan submitted
   in September and approved in October belongs to different months in each series.
   Later released/completed loans retain their approval event. Missing approval
@@ -52,32 +61,23 @@ are unchanged. Removed widgets remain available as source components.
 - A successful empty report displays numeric zeros. Failed requests display a
   dash / error and Retry, never a fabricated zero. Recent records sort by raw
   submission date, then creation timestamp, with a stable application-ID tie break.
-- Loan Types uses the existing `check_loan_eligibility` definition of active loans:
-  `approved`, `released` and `overdue`. Completed, rejected, pending and under-review
-  applications do not count. Types come directly from stored `loan_type` values;
-  percentages use the number of distinct active application IDs, not loan amounts.
-  Category colors are deterministic and independent of record order. A missing
-  type makes the distribution unavailable, while zero active loans shows an empty
-  state. The donut represents the current portfolio across all reporting periods;
-  it stays unchanged when the monthly chart's date filter changes.
+- Loan Types uses actual submitted-application counts for the selected reporting
+  period and includes all twelve configured categories, even when a category has
+  zero applications. Existing unrecognized stored values remain visible rather
+  than being rewritten. A missing type makes the distribution unavailable, while
+  a valid empty period shows an empty state.
 
 ## Existing capability gaps
 
-**Confirmed collections:** the existing `loan_payments` schema has payment amount
-and date, but no confirmation, failure, cancellation or reversal status, and no
-documented invariant that every row is a final successful collection. Summing it
-would not satisfy the requested confirmed-only metric. The Collections card
-therefore displays a dash and "Confirmed collections unavailable". An existing
-authoritative settled-payment source or explicit settlement/reversal semantics
-is required before enabling this calculation. No speculative status field or
-backend change was introduced.
+**Hosted reporting setup:** the local reporting migration defines the
+`portal_dashboard_totals` function used for pending applications, posted
+collections, and net disbursements. The linked project must have the verified
+function definition before these totals can be considered live; missing
+functions or schema errors produce an unavailable state and Retry.
 
-**Application details:** the existing loan applications table's View Details
-action only calls a "Frontend only" placeholder alert. There is no working
-application-details route. The Dashboard shows disabled View Details controls
-with an explanation instead of inventing a route or pretending the alert works.
-View All links to the existing role-aware `/admin/loan-applications`,
-`/super-admin/loan-applications`, or legacy `/loan-applications` route.
+**Application details:** the Dashboard opens the shared read-only application
+details view. It contains no processing, approval, rejection, return, or release
+actions. The same details view is used from the Loan Applications page.
 
 **Cancelled status:** the existing loan status constraint and API do not support
 Cancelled. The Dashboard displays only the seven statuses already supported.
@@ -90,12 +90,19 @@ Run checks with:
 node --test src/components/dashboard/dashboard-model.test.mjs src/components/dashboard/dashboard-data.test.mjs src/components/dashboard/loan-type-distribution.test.mjs
 ```
 
+The collection card is additionally covered by:
+
+```powershell
+node --test src/components/dashboard/DashboardMetrics.test.mjs
+```
+
 They cover period/time-zone boundaries, separate submission and approval months,
 release-only sums, duplicate protection, current-state counts, valid zeros,
 missing dates, recent ordering, pagination beyond 1,000 records, incomplete
-snapshots, invalid records, active-loan categories, percentages, stable colors and
-distribution empty/unavailable states. All 15 checks pass. Test fixtures are
-isolated from the UI.
+snapshots, invalid records, period-filtered and active-loan categories,
+percentages, stable colors, distribution empty/unavailable states, and collection
+value/error/retry presentation. All 18 checks pass. Test fixtures are isolated
+from the UI.
 
 The Dashboard content was also checked in an isolated browser context at 1440,
 1200, 1024, 768 and 390 px. Desktop charts have matching 387px card heights, aligned

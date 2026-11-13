@@ -50,11 +50,18 @@ export function loanDetailsPresentation(record: RecordData, applicationId: strin
   add(applicant, "Membership Type", membership ? getMembershipTypeLabel(membership) : undefined);
   if (!operational) add(applicant, "Monthly Income", currency(record.income));
   sections.push(applicant);
+  for(const [label,keys] of [["Email",["email"]],["Contact Number",["contact_number","phone_number","phone"]],["Address",["address","residential_address"]],["Occupation",["occupation","position"]],["Employer",["employer","employer_name"]]] as const){
+    add(applicant,label,keys.map(key=>text(record[key])??text(member[key])).find(Boolean));
+  }
+  const comaker:DetailSection={title:"Co-maker Information",fields:[]};
+  for(const [label,keys] of [["Co-maker Name",["co_maker_name","comaker_name"]],["Member Reference",["co_maker_member_id","comaker_member_id"]],["Relationship",["co_maker_relationship","relationship_to_co_maker"]]] as const){add(comaker,label,keys.map(key=>text(record[key])).find(Boolean));}
+  if(comaker.fields.length)sections.push(comaker);
+
   if (!operational) {
     const review: DetailSection = { title: "Application Review Information", fields: [] };
     if (status === "pending") review.message = "This loan application is awaiting administrative review.";
     else if (status === "under review") review.message = "This loan application is awaiting requirements and committee processing.";
-    else if (status === "returned") review.message="This application was returned for correction. Open Process Application to view the instructions and history.";
+    else if (status === "returned") review.message="This application was returned for correction. Review the recorded correction instructions and requirements below.";
     else if (status === "rejected") {
       review.title = "Rejection Information";
       if (rejection) {

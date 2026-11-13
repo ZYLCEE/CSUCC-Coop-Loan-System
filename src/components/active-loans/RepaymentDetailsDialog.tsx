@@ -89,9 +89,10 @@ function RepaymentDetails({ loanId, onClose, onUpdated }: { loanId: string; onCl
           <StatusBadge status={data.loan.status} />
           <Button size="compact" disabled={loading || busy} onClick={() => void refresh()}><RefreshCw className="h-3.5 w-3.5" aria-hidden="true" />Refresh</Button>
         </div>
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <div className="rounded-lg bg-surface-muted p-3"><p className="text-caption text-portal-secondary">Net recorded payments</p><p className="mt-1 text-card-title font-semibold tabular-nums">{pesos(Number(data.ledger.total_received))}</p></div>
           <div className="rounded-lg bg-surface-muted p-3"><p className="text-caption text-portal-secondary">Principal remaining</p><p className="mt-1 text-card-title font-semibold tabular-nums">{data.ledger.principal_remaining === null ? "Needs reconciliation" : pesos(Number(data.ledger.principal_remaining))}</p></div>
+          <div className="rounded-lg bg-surface-muted p-3"><p className="text-caption text-portal-secondary">Total remaining balance</p><p className="mt-1 text-card-title font-semibold tabular-nums">{data.ledger.total_remaining === undefined ? "Update required" : data.ledger.total_remaining === null ? "Needs reconciliation" : pesos(Number(data.ledger.total_remaining))}</p><p className="mt-1 text-caption text-portal-secondary">Includes unpaid interest and penalties</p></div>
           <div className="col-span-2 rounded-lg bg-surface-muted p-3 sm:col-span-1"><p className="mb-2 text-caption text-portal-secondary">Principal installments covered</p><RepaymentProgress progress={data.loan.progress} loanLabel={data.loan.applicationId} overdue={data.loan.status === "Overdue"} /></div>
         </div>
         <p className="mb-4 text-caption leading-5 text-portal-secondary">Month counts track principal installments. Interest, penalties and fees do not add months. Loan completion requires separate review.</p>

@@ -11,6 +11,10 @@ export async function reviewRequest(_query="",init:RequestInit={},endpoint?:stri
   const app=state.verificationData??=syntheticVerification();
   const data:AdminReviewState=state.reviewAdmin??={applicationId:app.applicationId,revision:app.revision,stateHash:app.stateHash,verificationStage:app.stage,
     verified:false,blockers:app.blockers,policyId:null,policyName:null,policyConfig:null,rules:null,candidates,cycles:[],events:[],finalDecision:null,canManage:true,canFinalize:false};
+  if(app.stage==="ready_for_committee"&&!data.cycles.some(cycle=>cycle.stage==="CRECOM"&&cycle.status!=="superseded")){
+    const reviewers=candidates.filter(candidate=>candidate.role==="crecom_member");
+    data.cycles.unshift({id:crypto.randomUUID(),stage:"CRECOM",cycle:1,packetVersion:1,status:"open",outcome:null,requiredApprovals:3,reviewerTarget:3,bodRequired:true,routingReason:"Project workflow specification",createdAt:new Date().toISOString(),assignments:reviewers.map(candidate=>({id:crypto.randomUUID(),membershipId:candidate.id,name:candidate.name,signatoryRole:candidate.committeeSeat==="chairperson"?"crecom_chairperson":"crecom_member",committeeMemberNumber:candidate.committeeMemberNumber??null,state:"assigned",revision:1,decision:null,reason:null,decidedAt:null}))});
+  }
   data.verificationStage=app.stage;data.revision=app.revision;data.verified=app.enrolled&&!app.stale&&!app.blockers.length&&!["needs_verification","not_started","returned_for_requirements"].includes(app.stage);
   data.blockers=app.blockers;data.policyId=app.policy?.id??null;data.policyName=app.policy?.name??null;
   data.policyConfig=app.policy?{reviewerCount:3,bodMode:"required",crecomAuthority:"recommendation"}:null;

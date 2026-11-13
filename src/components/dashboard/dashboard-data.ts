@@ -43,6 +43,7 @@ function parseLoan(value: unknown): DashboardLoan {
     id: row.application_id,
     member: name || row.member_name,
     memberId: typeof member?.member_id === "string" ? member.member_id : "",
+    membershipType: member?.membership_type==="regular"||member?.membership_type==="associate"?member.membership_type:undefined,
     type: row.loan_type,
     amount,
     status,
@@ -62,7 +63,7 @@ export async function fetchDashboardLoans(): Promise<DashboardLoan[]> {
   let offset = 0;
   do {
     const { data, error, count } = await client.from("loan_applications")
-      .select("application_id,member_name,loan_type,amount,status,date_submitted,date_approved,date_released,created_at,members:members!loan_applications_member_id_fkey(member_id,first_name,last_name)", { count: "exact" })
+      .select("application_id,member_name,loan_type,amount,status,date_submitted,date_approved,date_released,created_at,members:members!loan_applications_member_id_fkey(member_id,first_name,last_name,membership_type)", { count: "exact" })
       .order("date_submitted", { ascending: false })
       .order("created_at", { ascending: false })
       .order("application_id", { ascending: true })

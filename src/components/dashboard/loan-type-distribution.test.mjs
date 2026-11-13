@@ -30,6 +30,18 @@ test("categories come from the records and keep their colors when order or other
   assert.equal(first.types.reduce((sum, item) => sum + item.percentage, 0), 100);
 });
 
+test("the selected reporting period counts submitted applications across statuses", () => {
+  const result = getLoanTypeDistribution([
+    { id: "in-period-1", type: "Regular Loan", status: "Released", submittedAt: "2026-10-01" },
+    { id: "in-period-2", type: "Medical Loan", status: "Rejected", submittedAt: "2026-10-31" },
+    { id: "out-of-period", type: "Regular Loan", status: "Pending", submittedAt: "2026-11-01" },
+  ], { start: "2026-10-01", end: "2026-11-01" }, ["Regular Loan", "Medical Loan"]);
+
+  assert.equal(result.total, 2);
+  assert.equal(result.types.find((item) => item.name === "Regular Loan").count, 1);
+  assert.equal(result.types.find((item) => item.name === "Medical Loan").count, 1);
+});
+
 test("empty and missing-type data are distinguished without inventing categories or percentages", () => {
   assert.deepEqual(getLoanTypeDistribution([]), { total: 0, types: [], unavailable: false });
   assert.deepEqual(getLoanTypeDistribution([{ id: "a", type: " ", status: "Released" }]),

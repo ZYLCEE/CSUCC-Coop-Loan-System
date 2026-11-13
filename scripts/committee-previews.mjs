@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
+import {checkCommitteeAccountActions} from "./committee-account-actions-previews.mjs";
+import {checkCommitteePortal} from "./committee-portal-previews.mjs";
 import {resolve} from "node:path";
 export async function checkCommittee({browser,url,screenshots}){
  const page=await browser.newPage({viewport:{width:1366,height:768}});
  const errors=[];page.on("pageerror",error=>errors.push(error.message));
  await page.goto(url+"?committee=accounts");
- await page.getByRole("button",{name:"Manage",exact:true}).waitFor();
+ await page.getByRole("button",{name:/^Open actions for/}).waitFor();
  await page.getByRole("button",{name:"Create Committee Account"}).click();
  await page.getByRole("button",{name:"Review",exact:true}).click();
  await page.getByRole("alert").filter({hasText:"highlighted fields"}).waitFor();
@@ -41,15 +43,16 @@ export async function checkCommittee({browser,url,screenshots}){
  const calls=await page.evaluate(()=>window.committeeCalls.filter(call=>call.body?.operation==="create"));
  assert.equal(calls.length,2);assert.equal(calls[1].body.payload.committeeSeat,"member");assert.equal(calls[1].body.payload.committeeMemberNumber,1);
  assert.equal(calls[1].body.requestId,first.body.requestId);assert.deepEqual(calls[1].body.payload,first.body.payload);
- await page.getByRole("button",{name:"Manage",exact:true}).first().click();
- await page.getByRole("button",{name:"Deactivate",exact:true}).click();
+ await page.getByRole("button",{name:/^Open actions for/}).first().click();
+ await page.getByRole("menuitem",{name:"Block",exact:true}).click();
  await page.getByRole("button",{name:"Review",exact:true}).click();
  await page.getByRole("alert").filter({hasText:"reason"}).waitFor();
  await page.getByLabel("Reason",{exact:true}).fill("Membership term ended.");
  await page.getByRole("button",{name:"Review",exact:true}).click();
  await page.getByLabel("Your account password",{exact:true}).fill("Synthetic-Not-A-Real-Password1!");
- await page.getByRole("button",{name:"Confirm",exact:true}).click();
- await page.getByText("inactive",{exact:true}).waitFor();
+ await page.getByRole("button",{name:"Verify Password",exact:true}).click();
+ await page.getByRole("button",{name:"Block Account",exact:true}).click();
+ await page.getByRole("region",{name:"Committee accounts",exact:true}).getByText("Blocked",{exact:true}).waitFor();
  await page.screenshot({path:resolve(screenshots,"committee-accounts.png")});
  await page.goto(url+"?committee=assignments");
  await page.getByRole("table").waitFor();
@@ -60,22 +63,23 @@ export async function checkCommittee({browser,url,screenshots}){
  await page.getByRole("button",{name:"Previous page"}).click();
  assert.equal(await page.locator("tbody tr").count(),10);
  assert.equal(await page.getByText("Business Loan",{exact:true}).count(),10);
- await page.goto(url+"?committee=packet");await page.getByText("Identity and terms verified.",{exact:true}).waitFor();
+ await page.goto(url+"?committee=packet");await page.getByRole("tab",{name:"Requirements",exact:true}).click();await page.getByText("Identity and terms verified.",{exact:true}).waitFor();
  await page.getByRole("button",{name:"View document"}).click();
  await page.getByRole("link",{name:"Open original"}).waitFor();
  const file=await page.evaluate(()=>window.committeeCalls.find(call=>call.query.includes("operation=file")));
  assert.match(file.query,/versionId=version-pinned/);
- await page.getByRole("button",{name:"Close",exact:true}).click();
+ await page.getByRole("button",{name:"Close document",exact:true}).click();
  await page.evaluate(()=>{window.committeePacketDenied=true;});
- await page.getByRole("button",{name:"Refresh assigned packet"}).click();
+ await page.getByRole("button",{name:"Refresh",exact:true}).click();
  await page.getByRole("alert").filter({hasText:"Access is no longer available"}).waitFor();
  assert.equal(await page.getByRole("button",{name:"View document"}).count(),0);
  await page.goto(url+"?committee=notifications");
  await page.getByRole("heading",{name:/^Review assigned/}).waitFor();
- assert.equal(await page.getByRole("link",{name:"View assigned case"}).count(),1);
- assert.equal(await page.getByRole("link",{name:"View assigned case"}).getAttribute("href"),"/crecom/review/assignment-own");
+ assert.equal(await page.getByRole("button",{name:"View Application",exact:true}).count(),1);
+
  await page.getByRole("button",{name:"Mark all read"}).click();
  await page.waitForFunction(()=>window.committeeInbox.every(row=>row.read));
+ await page.getByRole("button",{name:"My notifications",exact:true}).waitFor();
  await page.goto(url+"?committee=profile");
  assert.equal(await page.getByLabel("Registered email").isDisabled(),true);
  assert.equal(await page.getByRole("button",{name:/Save profile|Update password/}).count(),2);
@@ -125,5 +129,7 @@ export async function checkCommittee({browser,url,screenshots}){
  await bod.getByRole('region',{name:'Committee accounts',exact:true}).getByText('Password setup pending',{exact:true}).waitFor();
  await bod.screenshot({path:resolve(screenshots,'bod-account-created.png')});await bod.close();
  assert.deepEqual(errors,[]);
+ await checkCommitteeAccountActions({browser,url,screenshots});
+ await checkCommitteePortal({browser,url,screenshots});
  console.log("PASS: BOD creation before policy activation, numbered committee positions, inline validation, independent password visibility, safe retry, assigned Admin permission and reviewer regressions.");
 }

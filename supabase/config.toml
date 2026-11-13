@@ -17,5 +17,8 @@ verify_jwt = false
 [functions.list-admin-accounts]
 verify_jwt = true
 
+[functions.send-borrower-notification-emails]
+verify_jwt = false
+
 [auth.email.smtp]
 sender_name = "CSUCC MPC"

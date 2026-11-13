@@ -50,7 +50,7 @@ export default function CounterPaymentDialog({ loanId, onClose, onSaved }: { loa
   };
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    if (submitting.current || ledger?.automatic_allocation === undefined) return;
+    if (submitting.current || ledger?.automatic_allocation !== true) return;
     setError(''); setNotice('');
     submitting.current = true; setBusy(true);
     try {
@@ -73,15 +73,17 @@ export default function CounterPaymentDialog({ loanId, onClose, onSaved }: { loa
     finally { submitting.current = false; setBusy(false); }
   };
   const eligible = ledger && ['released', 'overdue'].includes(ledger.status) && ledger.date_released && !ledger.unallocated_payments;
+  const fullyPaid = ledger?.total_remaining != null && Number(ledger.total_remaining) <= 0 && !ledger.unallocated_payments;
   const setupRequired = ledger?.automatic_allocation === undefined;
+  const allocationBlocked = ledger?.automatic_allocation === false;
   let total: number | null = null;
   try { total = amountInCentavos(draft.amount) / 100; } catch { /* Input validation is shown on review. */ }
 
   return <FormDialog icon={Wallet} dirty={!!draft.receipt || !!draft.amount || draft.date !== manilaToday() || !!review} title="Record payment" titleId="counter-payment-title" subtitle={ledger ? `${ledger.application_id} · ${ledger.member_name}` : undefined}
     className="max-w-[640px]" busy={busy} onClose={() => { if (!submitting.current) onClose(); }}
     footer={<><Button data-dialog-close disabled={busy}>Close</Button>
-      {canWrite && eligible && <Button type="submit" form="counter-payment-form" variant="primary" loading={busy}
-        disabled={setupRequired || busy || loading || !!review}>{busy ? "Calculating…" : "Review payment"}</Button>}
+      {canWrite && eligible && !fullyPaid && <Button type="submit" form="counter-payment-form" variant="primary" loading={busy}
+        disabled={setupRequired || allocationBlocked || busy || loading || !!review}>{busy ? "Calculating…" : "Review payment"}</Button>}
     </>}>
       {error && <p role="alert" className="mb-4 rounded-lg bg-status-danger-surface p-3 text-sm text-status-danger">{error}</p>}
       {notice && <ActionResultDialog success title="Payment records updated" message={notice} onClose={() => setNotice('')}>
@@ -90,24 +92,24 @@ export default function CounterPaymentDialog({ loanId, onClose, onSaved }: { loa
       {loading && <LoadingState label="Loading payment records…" />}
       <button disabled={busy || loading} onClick={() => void refresh()} className="ui-button ui-button--compact">Refresh balances</button>
       {ledger && <>
-        <dl className="my-3 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-3 text-sm"><div><dt>Original principal</dt><dd className="mt-1 font-semibold">{pesos(Number(ledger.principal))}</dd></div><div><dt>Principal remaining</dt><dd className="mt-1 font-semibold">{ledger.principal_remaining == null ? 'Needs reconciliation' : pesos(Number(ledger.principal_remaining))}</dd></div></dl>
-        <p className="mb-3 text-xs text-portal-secondary">Principal remaining excludes interest and charges. Payment history is in Repayment Details.</p>
+        <dl className="my-3 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-3 text-sm sm:grid-cols-3"><div><dt>Original principal</dt><dd className="mt-1 font-semibold">{pesos(Number(ledger.principal))}</dd></div><div><dt>Principal remaining</dt><dd className="mt-1 font-semibold">{ledger.principal_remaining == null ? 'Needs reconciliation' : pesos(Number(ledger.principal_remaining))}</dd></div><div><dt>Total remaining balance</dt><dd className="mt-1 font-semibold">{ledger.total_remaining === undefined ? 'Update required' : ledger.total_remaining === null ? 'Needs reconciliation' : pesos(Number(ledger.total_remaining))}</dd></div></dl>
+        <p className="mb-3 text-xs text-portal-secondary">Total remaining includes unpaid principal, interest, and penalties. Processing and service fees are deducted at release and are not charged again here.</p>
         {ledger.automatic_allocation !== undefined && <details className="mb-3 text-xs leading-5 text-portal-muted">
           <summary className="cursor-pointer font-medium">How payments are applied</summary>
-          <p className="mt-2">The payment covers penalties first, then accrued interest, then principal.</p>
+          <p className="mt-2">The payment covers penalties first, then scheduled interest, then principal.</p>
           <p className="mt-1">
-          {ledger.interest_rate_at_release == null
-            ? 'This loan has no release-time interest snapshot, so repayment interest is not added.'
-            : `Interest accrues monthly at ${Number(ledger.interest_rate_at_release)}% on declining principal.`}
+          {'Interest follows the saved repayment schedule when available; otherwise it uses the release-time rate snapshot.'}
           {' '}Processing and service fees are charged once at release, not in this receipt. Unknown historical penalty periods are not back-charged.
           </p>
         </details>}
-        {canWrite && !eligible && <p className="mb-4 text-sm text-status-warning">{ledger.unallocated_payments ? 'Older payments have no recorded allocation. Reconcile those records before adding payments.' : 'Payments are enabled after the loan is released and its release date is recorded.'}</p>}
-        {canWrite && eligible && <form id="counter-payment-form" onSubmit={event => void submit(event)}>
+        {canWrite && !eligible && !fullyPaid && <p className="mb-4 text-sm text-status-warning">{ledger.unallocated_payments ? 'Older payments have no recorded allocation. Reconcile those records before adding payments.' : 'Payments are enabled after the loan is released and its release date is recorded.'}</p>}
+        {canWrite && fullyPaid && <p role="status" className="mb-4 text-sm text-status-success">Fully paid. There is no remaining balance to record.</p>}
+        {canWrite && eligible && allocationBlocked && <p role="alert" className="mb-4 text-sm text-status-warning">Recorded charges do not match the calculated balance. Reconcile the payment history before recording another receipt.</p>}
+        {canWrite && eligible && !fullyPaid && <form id="counter-payment-form" onSubmit={event => void submit(event)}>
           {setupRequired ? (
             <p role="status" className="mb-3 text-support text-status-warning">Payment review and recording are unavailable until the counter-payment service is set up.</p>
           ) : null}
-          <fieldset disabled={setupRequired || busy || !!review || loading} className="grid gap-3 sm:grid-cols-2">
+          <fieldset disabled={setupRequired || allocationBlocked || busy || !!review || loading} className="grid gap-3 sm:grid-cols-2">
             <label className="block text-label">Official receipt number<Input ref={receiptField} required maxLength={80} value={draft.receipt} onChange={event => setDraft({ ...draft, receipt: event.target.value })} className={control} /></label>
             <label className="block text-label">Payment date<Input required type="date" min={ledger.date_released ?? undefined} max={manilaToday()} value={draft.date} onChange={event => setDraft({ ...draft, date: event.target.value })} className={control} /></label>
             <label className="block text-label sm:col-span-2">Amount paid (₱)<Input required inputMode="decimal" type="number" min="0.01" max="999999999.99" step="0.01" value={draft.amount} onChange={event => setDraft({ ...draft, amount: event.target.value })} className={control} /></label>

@@ -8,18 +8,22 @@ export async function captureLoanDetails({ browser, url, phase }) {
   const directory = resolve("docs/loan-details-qa", phase);
   mkdirSync(directory, { recursive: true });
   const metrics = [];
+  const requestedStatuses = process.env.COOP_LOAN_DETAILS_STATUSES?.split(",");
+  const statuses = ["pending", "under review", "rejected", "approved", "released", "completed", "overdue", ...(phase === "after" ? ["loading", "error", "missing"] : [])]
+    .filter(status => !requestedStatuses || requestedStatuses.includes(status));
   for (const viewport of [{ width: 1366, height: 768 }, { width: 768, height: 1024 }, { width: 390, height: 844 }]) {
     const context = await browser.newContext({ viewport, locale: "en-PH", timezoneId: "Asia/Manila" });
     await context.route("**/*", route => {
       const target = new URL(route.request().url());
       return target.origin === new URL(url).origin && ["/", "/bundle.js"].includes(target.pathname) ? route.continue() : route.abort();
     });
-    for (const status of ["pending", "under review", "rejected", "approved", "released", "completed", "overdue", ...(phase === "after" ? ["loading", "error", "missing"] : [])]) {
+    for (const status of statuses) {
       const page = await context.newPage();
       const errors = []; page.on("pageerror", error => errors.push(error.message));
       await page.addInitScript(({ status }) => {
         window.previewLoading = status === "loading";
         window.loanDetailsFailure = status === "error";
+        window.verificationScenario = status === "under review" ? "stale-review" : "review-stage";
         window.loanDetailsRecord = {
           status: ["loading", "error", "missing"].includes(status) ? "approved" : status,
           member_name: "Maria Dela Cruz — synthetic member",
@@ -42,8 +46,17 @@ export async function captureLoanDetails({ browser, url, phase }) {
       else if (status === "error") await dialog.getByRole("alert").waitFor();
       else {
         await dialog.getByRole("heading", { name: "Loan Application Information", exact: true }).or(dialog.getByRole("heading", { name: "Loan Summary", exact: true })).waitFor();
+        await dialog.getByText("Current Processing Stage", { exact: true }).waitFor();
+        if (status === "under review") {
+          await dialog.getByText("Packet needs re-verification", { exact: true }).waitFor();
+          await dialog.getByText("The recorded review packet is stale and requires re-verification.", { exact: true }).waitFor();
+          assert.equal(await dialog.getByText("Ready to forward", { exact: true }).count(), 0);
+        } else {
+          await dialog.getByText("CRECOM review", { exact: true }).waitFor();
+          assert.equal(await dialog.getByText("The recorded review packet is stale and requires re-verification.", { exact: true }).count(), 0);
+        }
         const preRelease = ["pending", "under review", "rejected", "approved", "missing"].includes(status);
-        assert.equal(await dialog.getByRole("button", { name: "Open repayment details", exact: true }).count(), preRelease ? 0 : 1);
+        assert.equal(await dialog.getByRole("button", { name: "Open repayment details", exact: true }).count(), preRelease ? 0 : 1, `${status}: repayment details visibility`);
         const text = await dialog.innerText();
         for (const hidden of ["INTERNAL-DO-NOT-DISPLAY", "Credit score", "Updated at", "No payments recorded"]) assert.ok(!text.includes(hidden), hidden);
         if (preRelease) for (const hidden of ["DV-SYNTHETIC-001", "Monthly installment", "Release date"]) assert.ok(!text.includes(hidden), hidden);
@@ -78,7 +91,7 @@ export async function captureLoanDetails({ browser, url, phase }) {
     }
     await context.close();
   }
-  if (phase === "after") {
+  if (phase === "after" && !requestedStatuses) {
     for (const role of ["admin", "super_admin"]) {
       const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
       await context.route("**/*", route => new URL(route.request().url()).origin === new URL(url).origin ? route.continue() : route.abort());

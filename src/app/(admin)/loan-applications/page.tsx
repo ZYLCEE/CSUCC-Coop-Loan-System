@@ -1,12 +1,14 @@
 "use client";
+import {loanTypeLabel,loanTypeOptions as buildLoanTypeOptions} from "@/lib/loanTypes";
 
 import { actionButtonStyles } from "@/components/shared/actionButtonStyles";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Toolbar, {
   LoanPaginationControls,
   LoanSortOption,
   LoanStatusFilter,
 } from "@/components/loan-applications/Toolbar";
+import ApplicationNotificationDetails from "@/components/loan-applications/ApplicationNotificationDetails";
 import LoanApplicationsTable from "@/components/loan-applications/LoanApplicationsTable";
 import { Card } from "@/components/ui/Card";
 import { LoadingState } from "@/components/ui/Feedback";
@@ -95,7 +97,7 @@ export default function LoanApplicationsPage() {
   }, []);
 
   const loanTypeOptions = useMemo(() => {
-    return Array.from(new Set(applications.map((application) => application.type))).sort();
+    return buildLoanTypeOptions(applications.map(application=>application.type));
   }, [applications]);
 
   const filteredApplications = useMemo(() => {
@@ -112,7 +114,7 @@ export default function LoanApplicationsPage() {
         .toLowerCase();
       const matchesSearch = searchableText.includes(search);
       const matchesLoanType =
-        filters.loanType === "All Loan Types" || application.type === filters.loanType;
+        filters.loanType === "All Loan Types" || loanTypeLabel(application.type) === loanTypeLabel(filters.loanType);
       const matchesStatus =
         filters.status === "All Status" || application.status === filters.status;
       const matchesMembershipType =
@@ -210,6 +212,7 @@ export default function LoanApplicationsPage() {
 
   return (
     <Card padded={false} className="overflow-hidden">
+      <Suspense fallback={null}><ApplicationNotificationDetails/></Suspense>
       <PortalPageHeading section="loan-applications" />
       <Toolbar
         searchValue={filters.search}

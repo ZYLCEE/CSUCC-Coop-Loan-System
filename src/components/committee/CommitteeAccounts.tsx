@@ -1,4 +1,7 @@
 "use client";
+import CommitteeAccountActionsMenu from "./CommitteeAccountActionsMenu";
+import CommitteeCredentialDialog from "./CommitteeCredentialDialog";
+import CommitteeAccountConfirmation from "./CommitteeAccountConfirmation";
 import PortalPageHeading from "@/components/shared/PortalPageHeading";
 import AccountRoleBadge from "@/components/shared/AccountRoleBadge";
 import {useCallback,useEffect,useMemo,useRef,useState} from "react";
@@ -21,7 +24,7 @@ import type {DateSortOrder} from "@/lib/tablePagination";
 
 const date=(value:string|null)=>value?new Date(value).toLocaleDateString("en-PH",{timeZone:"Asia/Manila",month:"short",day:"numeric",year:"numeric"}):"No end date";
 type Mode="create"|"invite"|"edit"|"deactivate"|"reactivate"|"link";
-type Selection={mode:Mode;account?:CommitteeAccount};
+type Selection={mode:Mode|"reset"|"delete";account?:CommitteeAccount};
 export default function CommitteeAccounts(){
  const {role,can}=useAdminAuth(),permitted=role==="super_admin"||can("committee.accounts.manage"),[data,setData]=useState<CommitteeAccountsData|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[notice,setNotice]=useState("");
  const [query,setQuery]=useState(""),[filter,setFilter]=useState("all"),[statusFilter,setStatusFilter]=useState("all"),[positionFilter,setPositionFilter]=useState("all"),[page,setPage]=useState(1),[size,setSize]=useState(10),[sort,setSort]=useState<DateSortOrder>("Newest");
@@ -48,7 +51,7 @@ export default function CommitteeAccounts(){
    <FilterToolbar><SearchInput aria-label="Search committee accounts" placeholder="Search reviewer name or email…" value={query} onChange={event=>{setQuery(event.target.value);setPage(1);}} />
     <Select aria-label="Committee role" value={filter} onChange={event=>{setFilter(event.target.value);setPage(1);}}><option value="all">All committees</option><option value="crecom_member">CRECOM Members</option><option value="bod_member">BOD</option></Select>
     <Select aria-label="Committee position" value={positionFilter} onChange={event=>{setPositionFilter(event.target.value);setPage(1);}}><option value="all">All positions</option><option value="1">CRECOM Member 1</option><option value="2">CRECOM Member 2</option><option value="member">All CRECOM members</option><option value="chairperson">Chairpersons</option></Select>
-    <Select aria-label="Account status" value={statusFilter} onChange={event=>{setStatusFilter(event.target.value);setPage(1);}}><option value="all">All statuses</option><option value="active">Active</option><option value="invited">Password setup pending</option><option value="inactive">Inactive</option><option value="scheduled">Scheduled</option><option value="expired">Expired</option><option value="failed">Creation failed</option></Select>
+    <Select aria-label="Account status" value={statusFilter} onChange={event=>{setStatusFilter(event.target.value);setPage(1);}}><option value="all">All statuses</option><option value="active">Active</option><option value="invited">Password setup pending</option><option value="blocked">Blocked</option><option value="recovery_pending">Recovery Pending</option><option value="scheduled">Scheduled</option><option value="expired">Expired</option><option value="failed">Creation failed</option></Select>
     <Button onClick={()=>void load()} disabled={loading}>Refresh</Button>
     <Button variant="primary" onClick={()=>setSelection({mode:"create"})} disabled={!data||loading}><UserRoundPlus className="h-4 w-4" />Create Committee Account</Button>
    </FilterToolbar>
@@ -60,9 +63,9 @@ export default function CommitteeAccounts(){
       <td className="font-semibold">{account.name}</td><td>{account.email}</td>
       <td><AccountRoleBadge role={account.role}/><p className="mt-1 text-caption">{committeePositionLabel(account.role,account.committeeSeat,account.committeeMemberNumber)}</p>{account.role==="crecom_member"&&account.committeeSeat==="member"&&!account.committeeMemberNumber&&<p className="mt-1 text-caption text-status-warning">Set Member 1 or Member 2 in membership details.</p>}{account.title&&<p className="mt-0.5 text-caption text-portal-secondary">{account.title}</p>}</td>
       <td className="whitespace-nowrap"><p>{date(account.startsAt)}</p><p className="mt-0.5 text-caption text-portal-secondary">{account.endsAt?"Through "+date(new Date(Date.parse(account.endsAt)-1).toISOString()):"No end date"}</p></td>
-      <td><StatusBadge status={account.status} label={account.status==="invited"?"Password setup pending":undefined} className="capitalize" />{account.error&&<p className="mt-1 max-w-44 text-caption text-status-danger">{account.error}</p>}</td>
+      <td><StatusBadge status={account.status} label={account.status==="invited"?"Password setup pending":account.status==="recovery_pending"?"Recovery Pending":!account.active&&account.revision>0?"Blocked":undefined} className="capitalize" />{account.error&&<p className="mt-1 max-w-44 text-caption text-status-danger">{account.error}</p>}</td>
       <td className="text-center tabular-nums">{account.assignedCount}</td>
-      <td className="text-center"><Button size="compact" onClick={()=>account.revision>0?setDetails(account):setSelection({mode:account.creationMode==="password"?"create":"invite",account})}>{account.revision>0?"Manage":"Retry creation"}</Button></td>
+      <td className="text-center"><CommitteeAccountActionsMenu account={account} credentialsEnabled={data?.accountActionsVersion===1} onView={()=>setDetails(account)} onAction={mode=>setSelection({mode,account})}/></td>
      </tr>)}</tbody>
     </DataTable>
     {!rows.length&&<EmptyState title="No committee accounts." description="Create a separate account for each CRECOM member, CRECOM chairperson and BOD chairperson." />}
@@ -70,8 +73,9 @@ export default function CommitteeAccounts(){
      controls={<PaginationControls sortOption={sort} pageSize={size} onSortChange={value=>{setSort(value);setPage(1);}} onPageSizeChange={value=>{setSize(value);setPage(1);}} />} />
    </>}
   </Card>
-  {details&&<CommitteeAccountDetails account={details} onClose={()=>setDetails(null)} onAction={mode=>{setSelection({mode,account:details});setDetails(null);}} />}
-  {selection&&<CommitteeMembershipDialog {...selection} accounts={data?.accounts??[]} onClose={()=>setSelection(null)} onSaved={message=>{setSelection(null);setNotice(message);void load();}} />}
+  {details&&<CommitteeAccountDetails account={details} onClose={()=>setDetails(null)}/>}
+  {selection?.account&&(selection.mode==="reset"||selection.mode==="delete")&&<CommitteeCredentialDialog account={selection.account} operation={selection.mode} onClose={()=>setSelection(null)} onSaved={message=>{setSelection(null);setNotice(message);void load();}}/>}
+  {selection&&selection.mode!=="reset"&&selection.mode!=="delete"&&<CommitteeMembershipDialog mode={selection.mode} account={selection.account} accounts={data?.accounts??[]} onClose={()=>setSelection(null)} onSaved={message=>{setSelection(null);setNotice(message);void load();}} />}
  </>;
 }
 function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode:Mode;account?:CommitteeAccount;accounts:CommitteeAccount[];onClose:()=>void;onSaved:(message:string)=>void}){
@@ -81,7 +85,7 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
  const [memberNumber,setMemberNumber]=useState<1|2|null>(account?.committeeMemberNumber??null);
  const [start,setStart]=useState(membershipDateInput(account?.startsAt??new Date().toISOString())),[end,setEnd]=useState(membershipDateInput(account?.endsAt??null,true)),[reason,setReason]=useState(""),[password,setPassword]=useState("");
  const [review,setReview]=useState(false),[attempted,setAttempted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[requestId]=useState(()=>retry?account!.requestId:crypto.randomUUID()),[payload,setPayload]=useState<CommitteeInvite|null>(null);
- const label=creating?(retry?"Retry creation":"Create Committee Account"):mode==="edit"?"Edit membership":mode==="link"?"Send setup / reset link":mode==="deactivate"?"Deactivate membership":"Reactivate membership";
+ const label=creating?(retry?"Retry creation":"Create Committee Account"):mode==="edit"?"Edit Committee Account":mode==="link"?"Send setup / reset link":mode==="deactivate"?"Block Account":"Unblock Account";
  const [temporary,setTemporary]=useState(""),[temporaryConfirm,setTemporaryConfirm]=useState(""),[identityVerified,setIdentityVerified]=useState(false);
  const pending=useRef(false),[checked,setChecked]=useState(false),[touched,setTouched]=useState<Record<string,boolean>>({});
  const fieldErrors:Record<string,string>={};
@@ -122,6 +126,7 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
   }catch(error){setError(error instanceof Error?error.message:"The committee action failed. Retry this request.");}
   finally{pending.current=false;setPassword("");setBusy(false);}
  };
+ if(review&&!creating&&account)return <CommitteeAccountConfirmation title={mode==="edit"?"Save Changes":label} account={account} operation={mode} payload={mode==="edit"?{...payload,reason:reason.trim()}:{reason:reason.trim()}} requestId={requestId} onBack={()=>setReview(false)} onClose={onClose} onSaved={onSaved} onAttempt={()=>setAttempted(true)}/>;
  return <ActionDialog title={label} subtitle={account?.email} onClose={onClose} busy={busy} className="max-w-xl" footer={<><Button disabled={busy} onClick={onClose}>Cancel</Button>{review?<Button variant="primary" loading={busy} onClick={()=>void save()}>{mode==="create"?"Create account":mode==="invite"?"Send invitation":"Confirm"}</Button>:<Button variant="primary" onClick={prepare}>Review</Button>}</>}>
   {review?<div className="space-y-4 text-support">
    <dl className="grid grid-cols-2 gap-3"><div><dt className="text-caption text-portal-secondary">Reviewer</dt><dd className="break-words font-semibold">{name||account?.name}</dd></div><div><dt className="text-caption text-portal-secondary">Approval position</dt><dd>{committeePositionLabel(role,committeeSeat,memberNumber)}</dd></div>
@@ -142,7 +147,7 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
     <CommitteeField label="Title (optional)"><Input value={title} onChange={event=>setTitle(event.target.value)} maxLength={100} disabled={retry||attempted} /></CommitteeField>
     <CommitteeField label="Start date" id="committee-account-start" error={shownError("start")}><Input {...inputProps("start")} type="date" value={start} onChange={event=>setStart(event.target.value)} disabled={retry||attempted} /></CommitteeField>
     <CommitteeField label="End date (optional)" id="committee-account-end" error={shownError("end")}><Input {...inputProps("end")} type="date" value={end} min={start} onChange={event=>setEnd(event.target.value)} disabled={retry||attempted} /></CommitteeField>
-   </>:<p className="sm:col-span-2">{mode==="link"?"Request a personal setup or reset link for this reviewer.":mode==="deactivate"?"Deactivate this membership and remove access to assigned work.":"Reactivate this membership using its current committee and dates."}</p>}
+   </>:<p className="sm:col-span-2">{mode==="link"?"Request a personal setup or reset link for this reviewer.":mode==="deactivate"?"Block this reviewer and remove access to assigned work.":"Unblock this reviewer using their current committee position and membership dates."}</p>}
    {mode==="create"&&<><CommitteeField label="Temporary password" id="committee-account-temporary" error={shownError("temporary")}><CommitteePasswordField {...inputProps("temporary")} label="Temporary password" autoComplete="new-password" value={temporary} onChange={event=>setTemporary(event.target.value)} maxLength={128} /></CommitteeField><CommitteeField label="Confirm temporary password" id="committee-account-confirm" error={shownError("confirm")}><CommitteePasswordField {...inputProps("confirm")} label="Confirm temporary password" autoComplete="new-password" value={temporaryConfirm} onChange={event=>setTemporaryConfirm(event.target.value)} maxLength={128} /></CommitteeField><p className="text-caption text-portal-secondary sm:col-span-2">Use 8–128 characters with uppercase, lowercase, a number and a symbol. Both passwords must match.</p><label className="flex items-start gap-2 sm:col-span-2"><input type="checkbox" checked={identityVerified} onChange={event=>setIdentityVerified(event.target.checked)} /><span>I verified this person&apos;s identity, email and committee appointment.</span></label>{shownError("identity")&&<p className="text-caption text-status-danger sm:col-span-2">{shownError("identity")}</p>}</>}
    {["edit","deactivate","reactivate"].includes(mode)&&<div className="sm:col-span-2"><CommitteeField label="Reason"><Textarea value={reason} onChange={event=>setReason(event.target.value)} maxLength={2000} rows={2} /></CommitteeField></div>}
    {retry&&<p className="text-caption text-portal-secondary sm:col-span-2">Retry keeps the original request details to prevent duplicate accounts.</p>}
@@ -152,13 +157,13 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
  </ActionDialog>;
 }
 type MembershipAssignment={id:string;applicationId:string;stage:string;cycle:number;state:string;assignedAt:string;needsReassignment:boolean};
-function CommitteeAccountDetails({account,onClose,onAction}:{account:CommitteeAccount;onClose:()=>void;onAction:(mode:Mode)=>void}){
+function CommitteeAccountDetails({account,onClose}:{account:CommitteeAccount;onClose:()=>void}){
  const [rows,setRows]=useState<MembershipAssignment[]|null>(null),[error,setError]=useState("");
  useEffect(()=>{let active=true;void committeeRequest<MembershipAssignment[]>("id="+encodeURIComponent(account.id),{},true).then(value=>{if(active)setRows(value);}).catch(error=>{if(active)setError(error instanceof Error?error.message:"Assignment history could not be loaded.");});return()=>{active=false;};},[account.id]);
- return <ActionDialog title={account.name} subtitle={account.email} onClose={onClose} className="max-w-3xl" footer={<Button onClick={onClose}>Close</Button>}>
-  <div className="flex flex-wrap items-center gap-2 text-support"><StatusBadge status={account.status} label={account.status==="invited"?"Password setup pending":undefined} className="capitalize" /><span>{committeePositionLabel(account.role,account.committeeSeat,account.committeeMemberNumber)}</span><span className="text-portal-secondary">{account.title}</span></div>
+ return <ActionDialog title="Committee Account Details" subtitle={account.name+" | "+account.email} onClose={onClose} className="max-w-3xl" footer={<Button onClick={onClose}>Close</Button>}>
+  <div className="flex flex-wrap items-center gap-2 text-support"><StatusBadge status={account.status} label={account.status==="invited"?"Password setup pending":account.status==="recovery_pending"?"Recovery Pending":!account.active&&account.revision>0?"Blocked":undefined} className="capitalize" /><span>{committeePositionLabel(account.role,account.committeeSeat,account.committeeMemberNumber)}</span><span className="text-portal-secondary">{account.title}</span></div>
   <dl className="my-4 grid gap-3 text-support sm:grid-cols-2"><div><dt className="text-caption text-portal-secondary">Membership</dt><dd>{date(account.startsAt)} · {account.endsAt?"Through "+date(new Date(Date.parse(account.endsAt)-1).toISOString()):"No end date"}</dd></div><div><dt className="text-caption text-portal-secondary">Account setup</dt><dd>{account.setupCompletedAt?date(account.setupCompletedAt):"Awaiting personal password setup"}</dd></div></dl>
-  <div className="mb-5 flex flex-wrap gap-2"><Button size="compact" onClick={()=>onAction("edit")}>Edit membership</Button><Button size="compact" onClick={()=>onAction(account.active?"deactivate":"reactivate")}>{account.active?"Deactivate":"Reactivate"}</Button><Button size="compact" onClick={()=>onAction("link")} disabled={!account.active}>Send setup / reset link</Button></div>
+
   <h3 className="mb-2 text-support font-semibold">Assignment history</h3>
   {error?<p role="alert" className="text-support text-status-danger">{error}</p>:rows===null?<LoadingState label="Loading assignments…" />:rows.length?<DataTable density="compact" label="Reviewer assignments"><thead><tr><th className="text-left">Application</th><th className="text-left">Stage / cycle</th><th className="text-left">State</th><th className="text-left">Access follow-up</th></tr></thead><tbody>{rows.map(row=><tr key={row.id}><td>{row.applicationId}</td><td>{row.stage} · {row.cycle}</td><td>{row.state.replaceAll("_"," ")}</td><td>{row.needsReassignment?"Requires reassignment":"—"}</td></tr>)}</tbody></DataTable>:<p className="text-support text-portal-secondary">No assignments have been recorded for this membership.</p>}
  </ActionDialog>;

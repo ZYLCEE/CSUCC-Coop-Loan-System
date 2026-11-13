@@ -3,6 +3,7 @@ import {committeeSession,verifiedSuperAdmin,verifiedAdministratorAction,committe
 import {isActiveAdministrator} from "@/lib/adminPrivileges";
 import {getCommitteeRole} from "@/lib/committee";
 import {validateExecutionRules,validateReviewMutation} from "@/lib/committeeReview";
+import {withCommitteeApprovalProgress} from "@/lib/committeeProgressServer";
 export async function GET(request:Request){
  try{
   const {session,user}=await committeeSession(request);
@@ -10,7 +11,7 @@ export async function GET(request:Request){
   const id=new URL(request.url).searchParams.get("applicationId");
   if(!id?.trim()||id.length>100)throw new CommitteeError("Choose an application.");
   const result=await session.rpc("committee_review_state",{p_application_id:id});checkCommitteeError(result.error);
-  return committeeReply(result.data);
+  return committeeReply({...result.data,canFinalize:user.app_metadata.role==="super_admin"&&result.data?.canFinalize===true});
  }catch(error){return committeeFailure(error);}
 }
 export async function POST(request:Request){
@@ -27,7 +28,9 @@ export async function POST(request:Request){
   let input;try{input=validateReviewMutation(body);}catch(error){throw new CommitteeError(error instanceof Error?error.message:"Complete the review action.");}
   let actorId:string;
   if(input.operation==="finalize"){
-   actorId=(await verifiedAdministratorAction(request,body.password,"applications.finalize")).user.id;
+   const confirmed=await verifiedAdministratorAction(request,body.password,"applications.finalize");
+   if(confirmed.user.app_metadata.role!=="super_admin")throw new CommitteeError("Only Super Admin may record the final decision.",403);
+   actorId=confirmed.user.id;
   }else{
    const context=await committeeSession(request),{session,user}=context;
    actorId=user.id;
@@ -43,10 +46,20 @@ export async function POST(request:Request){
      const current=await session.rpc("portal_session_access");checkCommitteeError(current.error);
      if(current.data?.allowed!==true)throw new CommitteeError("Committee membership changed. Sign in again.",403);
     }finally{if(verified.data.session)await verifier.auth.signOut({scope:"local"}).catch(()=>{});}
+    if(getCommitteeRole(user)==="bod_member"&&["approve","reject"].includes(input.operation)){
+     const assigned=await session.rpc("committee_review_packet",{p_assignment_id:input.payload.assignmentId});checkCommitteeError(assigned.error);
+     if(assigned.data?.assignment?.stage!=="BOD"||assigned.data.assignment.applicationId!==input.applicationId)throw new CommitteeError("This BOD review is not assigned to the selected application.",403);
+     // Recorded-decision retries still go through SQL's immutable request replay.
+     if(!assigned.data.myDecision){
+      const [current]=await withCommitteeApprovalProgress(committeeServiceClient(request),[assigned.data.assignment]);
+      if(current.crecomConfirmations?.length!==3)throw new CommitteeError("All three CRECOM approvals for this application must be recorded before the BOD decision.",409);
+     }
+    }
    }else{
     if(!isActiveAdministrator(user))throw new CommitteeError("Administrator forwarding permission is required.",403);
     const permission=await session.rpc("document_staff_access",{p_privilege:"applications.forward"});checkCommitteeError(permission.error);
     if(permission.data!==true)throw new CommitteeError("Application forwarding permission is required.",403);
+    await verifiedAdministratorAction(request,body.password,"applications.forward");
    }
   }
   const {operation,...args}=input;

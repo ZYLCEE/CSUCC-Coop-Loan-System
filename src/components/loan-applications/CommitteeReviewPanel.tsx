@@ -1,4 +1,6 @@
 "use client";
+import {ActionResultDialog} from "@/components/ui/ActionResultDialog";
+import {workflowRequest} from "@/lib/applicationWorkflowRequest";
 import PasswordInput from "@/components/ui/PasswordInput";
 import {useCallback,useEffect,useRef,useState} from "react";
 import {reviewRequest} from "@/lib/committeeReviewRequest";
@@ -62,8 +64,8 @@ export default function CommitteeReviewPanel({applicationId,onUpdated}:{applicat
 }
 export function ReviewActionDialog({data,action,onClose,onSaved}:{data:AdminReviewState;action:Action;onClose:()=>void;onSaved:()=>Promise<void>}){
  const forwarding=action.operation==="forward"||action.operation==="forward_bod",targetRole=action.stage==="BOD"?"bod_member":"crecom_member";
- const [selected,setSelected]=useState<string[]>([]),[due,setDue]=useState(""),[reason,setReason]=useState(""),[replacement,setReplacement]=useState(""),[decision,setDecision]=useState("approve");
- const [password,setPassword]=useState("");
+ const [selected,setSelected]=useState<string[]>([]),[due,setDue]=useState(""),[reason,setReason]=useState(""),[replacement,setReplacement]=useState(""),[decision,setDecision]=useState(data.cycles.some(cycle=>cycle.status!=="superseded"&&cycle.outcome==="reject")?"reject":"approve");
+ const [password,setPassword]=useState(""),[success,setSuccess]=useState(false);
  const [review,setReview]=useState(false),[submitted,setSubmitted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),pending=useRef(false),request=useRef(crypto.randomUUID());
  const required=action.stage==="BOD"?data.rules?.bodReviewers:data.policyConfig?.reviewerCount;
  const activeCycle=data.cycles.find(item=>item.status!=="superseded"&&item.stage===action.stage);
@@ -81,16 +83,18 @@ export function ReviewActionDialog({data,action,onClose,onSaved}:{data:AdminRevi
  };
  const save=async()=>{
   if(pending.current)return;
-  if(action.operation==="finalize"&&!password){setError("Enter your account password.");return;}
+  if(!password){setError("Enter your account password.");return;}
   const payload=forwarding?{reviewers:selected,dueAt:due?due+"T23:59:59+08:00":null,...(action.operation==="forward"?{bodRequired:true,routingReason:"BOD chairperson confirmation required for every loan."}:{})}:
    {reason:reason.trim(),...(action.assignment?{assignmentId:action.assignment.id}:{}),...(action.operation==="reassign"?{membershipId:replacement}:{}),...(action.operation==="finalize"?{decision}:{})};
   pending.current=true;setSubmitted(true);setBusy(true);setError("");
   try{
-   await reviewRequest("",{method:"POST",body:JSON.stringify({operation:action.operation,applicationId:data.applicationId,revision:data.revision,stateHash:data.stateHash,payload,requestId:request.current,...(action.operation==="finalize"?{password}:{})})});
-   await onSaved();
+   const reject=action.operation==="finalize"&&decision==="reject";
+   await (reject?workflowRequest:reviewRequest)("",{method:"POST",body:JSON.stringify({operation:reject?"reject_application":action.operation,applicationId:data.applicationId,revision:data.revision,stateHash:data.stateHash,payload,requestId:request.current,password})});
+   setSuccess(true);
   }catch(error){setError(error instanceof Error?error.message:"The review action failed. Refresh and retry.");}
   finally{pending.current=false;setBusy(false);setPassword("");}
  };
+ if(success)return <ActionResultDialog success title="Review action recorded" message={`${labels[action.operation]} was recorded for ${data.applicationId}.`} overlayClassName="z-[160]" onClose={()=>{void onSaved();}}/>;
  const failedRequiredPanel=data.cycles.some(item=>item.status!=="superseded"&&item.outcome==="reject");
  return <ActionDialog title={labels[action.operation]} subtitle={data.applicationId} onClose={onClose} busy={busy} className="max-w-xl" overlayClassName="z-[160]" footer={<><Button disabled={busy} onClick={onClose}>Cancel</Button>{review?<Button variant="primary" loading={busy} onClick={()=>void save()}>Confirm {action.operation==="finalize"?"final decision":"review action"}</Button>:<Button variant="primary" onClick={prepare}>Review action</Button>}</>}>
   <div className="space-y-4 text-support">
@@ -109,7 +113,7 @@ export function ReviewActionDialog({data,action,onClose,onSaved}:{data:AdminRevi
     {action.assignment&&<p>Reviewer: {action.assignment.name}{replacement?" → "+eligible.find(item=>item.id===replacement)?.name:""}</p>}
     {action.operation==="finalize"&&<p className="font-semibold capitalize">Final decision: {decision}</p>}
     {reason&&<p className="whitespace-pre-wrap break-words">{reason}</p>}
-    {action.operation==="finalize"&&<CommitteeField label="Your account password"><PasswordInput label="Your account password"  autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} disabled={busy} /></CommitteeField>}
+    {<CommitteeField label="Your account password"><PasswordInput label="Your account password"  autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} disabled={busy} /></CommitteeField>}
     {!submitted&&!busy&&<Button size="compact" onClick={()=>setReview(false)}>Back to details</Button>}
    </>}
    {error&&<p role="alert" className="text-status-danger">{error}</p>}

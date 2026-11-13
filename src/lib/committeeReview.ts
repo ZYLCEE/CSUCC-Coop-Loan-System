@@ -12,6 +12,8 @@ export type ReviewAssignment={id:string;membershipId:string;name:string;signator
 export type ReviewCycle={id:string;stage:"CRECOM"|"BOD";cycle:number;packetVersion:number;status:string;outcome:"approve"|"reject"|null;requiredApprovals:number;reviewerTarget:number;bodRequired:boolean;routingReason:string;createdAt:string;assignments:ReviewAssignment[]};
 export type ReviewEvent={id:string;action:string;actor:string;reason:string;createdAt:string;assignmentId:string|null};
 export type AdminReviewState={
+ applicationSummary?:{applicationId?:string;applicant?:string;memberNumber?:string;loanType?:string;amount?:number;tenureMonths?:number;monthlyPayment?:number;purpose?:string}|null;
+ bodHandoffVersion?:number;
  applicationId:string;revision:number;stateHash:string;verificationStage:string;verified:boolean;blockers:string[];
  policyId:string|null;policyName:string|null;policyConfig:{reviewerCount:number;bodMode:string;crecomAuthority:string}|null;
  rules:PolicyExecutionRules|null;candidates:ReviewCandidate[];cycles:ReviewCycle[];events:ReviewEvent[];

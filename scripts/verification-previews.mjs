@@ -1,249 +1,135 @@
-import assert from 'node:assert/strict';
-import {resolve} from 'node:path';
-import {mkdirSync as mkdir} from 'node:fs';
-export async function checkVerification({browser,url}){
- const directory=resolve('docs/application-verification/screenshots');mkdir(directory,{recursive:true});
- const errors=[];
- const page=await browser.newPage({viewport:{width:1366,height:900}});page.on('pageerror',error=>errors.push(error.message));
- await page.goto(url+'/?workflow=loans');
- await page.getByRole('button',{name:'Open actions for APP-TEST',exact:true}).click();
- assert.equal(await page.getByLabel('Filter application processing stage',{exact:true}).count(),0);
- await page.getByRole('menuitem',{name:'Process Application',exact:true}).click();
- await page.getByRole('heading',{name:'Process Application',exact:true}).waitFor();
- await page.getByRole('navigation',{name:'Application processing steps'}).waitFor();
- assert.equal(await page.getByRole('navigation',{name:'Application processing steps'}).getByRole('button').count(),5);
- await page.getByRole('button',{name:'Start checking',exact:true}).click();
- let confirmation=page.getByRole('dialog',{name:'Start checking requirements?',exact:true});
- await confirmation.getByRole('button',{name:'Start checking',exact:true}).evaluate(el=>{el.click();el.click();});
- await confirmation.waitFor({state:'detached'});
- assert.equal(await page.evaluate(()=>window.verificationCalls.filter(item=>item.operation==='start').length),1);
- assert.equal(await page.getByRole('button',{name:'Mark as verified',exact:true}).isDisabled(),true);
- await page.getByLabel('Member identity and application details checked').check();
- await page.getByLabel('Membership eligibility and affordability checked').check();
- await page.getByLabel('Loan amount, term and payment projection checked').check();
- assert.equal(await page.getByText('Internal notes (optional)',{exact:true}).count(),0);
+import assert from "node:assert/strict";
+import { mkdirSync } from "node:fs";
+import { resolve } from "node:path";
 
- await page.evaluate(()=>{window.verificationFailure=true;});
- await page.getByRole('button',{name:'Save checks',exact:true}).click();
- await page.getByRole('alert').filter({hasText:'Synthetic verification service failed'}).waitFor();
- assert.equal(await page.getByLabel('Member identity and application details checked').isChecked(),true);
- await page.evaluate(()=>{window.verificationFailure=false;});
- await page.getByRole('button',{name:'Save checks',exact:true}).click();
- await page.getByText('Checks saved.',{exact:true}).waitFor();
- const retry=await page.evaluate(()=>window.verificationCalls.filter(item=>item.operation==='save_draft'));
- assert.equal(retry[0].requestId,retry[1].requestId);
- await page.screenshot({path:resolve(directory,'verification-checklist.png'),fullPage:true});
- await page.getByRole('button',{name:'Return Application',exact:true}).click();
- confirmation=page.getByRole('dialog',{name:'Return Application',exact:true});
- await confirmation.getByLabel('Correction category',{exact:true}).selectOption('documents');
- await confirmation.getByLabel('Valid ID',{exact:true}).check();
- await confirmation.getByLabel('Reason and correction instructions',{exact:true}).fill('Please replace the blurred ID photo with a readable copy.');
- await page.screenshot({path:resolve(directory,'return-confirmation.png'),fullPage:true});
- await confirmation.getByRole('button',{name:'Review return',exact:true}).click();
- await confirmation.getByRole('button',{name:'Confirm return',exact:true}).click();
- await confirmation.getByRole('alert').filter({hasText:'account password'}).waitFor();
- await confirmation.getByLabel('Your account password',{exact:true}).fill('Synthetic-Password1!');
- await confirmation.getByRole('button',{name:'Confirm return',exact:true}).click();await confirmation.waitFor({state:'detached'});
- await page.getByText('Processing history & additional actions',{exact:true}).click();
- await page.getByText('Please replace the blurred ID photo with a readable copy.',{exact:true}).first().waitFor();
- await page.getByRole('button',{name:'Close',exact:true}).click();
- await page.getByRole('region',{name:'Loan applications table',exact:true}).getByText('Returned for requirements',{exact:true}).waitFor();
- await page.getByRole('button',{name:'Open actions for APP-TEST',exact:true}).click();
- assert.equal(await page.getByRole('menuitem',{name:'Approve Application',exact:true}).count(),0);
- await page.close();
- await checkFiveSteps({browser,url,directory,errors});
- for(const role of['admin','super_admin']){
-   const policy=await browser.newPage({viewport:{width:role==='admin'?390:1366,height:900}});policy.on('pageerror',error=>errors.push(error.message));
-   await policy.addInitScript(role=>{window.testRole=role;},role);
-   await policy.goto(url+'/?workflow=policy');await policy.getByRole('button',{name:'Approval Workflow',exact:true}).click();
-   await policy.getByRole('heading',{name:'Approval workflow policy',exact:true}).waitFor();
-   if(role==='admin'){
-     assert.equal(await policy.getByLabel('Policy draft name',{exact:true}).isDisabled(),true);
-     assert.equal(await policy.getByRole('button',{name:'Save policy draft',exact:true}).count(),0);
-   }else{
-     await policy.getByLabel('Policy draft name',{exact:true}).fill('CSUCC committee workflow draft');
-     await policy.getByLabel('CRECOM reviewers per application',{exact:true}).fill('3');
-     await policy.getByLabel('CRECOM authority',{exact:true}).selectOption('recommendation');
-     await policy.getByRole('button',{name:'Save policy draft',exact:true}).click();
-     await policy.getByRole('button',{name:'Save draft version',exact:true}).click();
-     await policy.getByText('A new policy draft version was saved. Existing application policies were not changed.',{exact:true}).waitFor();
-     assert.equal(await policy.evaluate(()=>window.verificationPolicies[0].status),'draft');
-   }
-   await policy.screenshot({path:resolve(directory,'policy-'+role+'.png'),fullPage:true});
-   assert.equal(await policy.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);await policy.close();
- }
- assert.deepEqual(errors,[]);console.log('PASS: five-step application processing, stage permissions, confirmations, draft retry safety, requirements returns/history, single status filter, final-decision gates and desktop/mobile layout.');
-}
+export async function checkVerification({ browser, url }) {
+  const directory = resolve("docs/application-verification/screenshots");
+  mkdirSync(directory, { recursive: true });
+  const errors = [];
+  const page = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+  page.on("pageerror", (error) => errors.push(error.message));
 
-async function checkFiveSteps({browser,url,directory,errors}){
- const page=await browser.newPage({viewport:{width:1366,height:900}});page.on('pageerror',error=>errors.push(error.message));
- await page.goto(url+'/?workflow=loans');
- await page.getByRole('button',{name:'Open actions for APP-TEST',exact:true}).click();
- await page.getByRole('menuitem',{name:'Process Application',exact:true}).click();
- await page.getByRole('button',{name:'Start checking',exact:true}).click();
- await page.getByRole('dialog',{name:'Start checking requirements?',exact:true}).getByRole('button',{name:'Start checking',exact:true}).click();
- await page.getByText('Requirements check started.',{exact:true}).waitFor();
- // Viewing a future step must not offer a forwarding or final-decision action.
- await page.getByRole('button',{name:'Step 4: Final Decision',exact:true}).click();
- assert.equal(await page.getByRole('button',{name:'Record final decision',exact:true}).count(),0);
- await page.getByRole('button',{name:'Back to current step',exact:true}).click();
- // Submission and review are separate, and evidence is visible without expanding history.
- await page.evaluate(()=>{
-   const app=window.verificationData;window.savedRequirement=app.documents.pop();
-   app.documents[0].reviewStatus='to_review';app.documents[0].reviewId=null;
-   app.evidence={borrower:1,coMaker:0,witnesses:1};
-   app.policy={id:'90000000-0000-0000-0000-000000000001',name:'SYNTHETIC APPROVED POLICY',version:1,status:'approved',config:{reviewerCount:3,bodMode:'required',crecomAuthority:'recommendation',borrowerConsentRequired:true,coMakerConsentRequired:true,witnessCount:2,allowedConsentMethods:['otp','paper']},authorizationReference:'SYNTHETIC ONLY',createdBy:'Synthetic coordinator',createdAt:new Date().toISOString()};
- });
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- const documents=page.getByRole('table',{name:'Required documents',exact:true});
- await documents.getByRole('row').filter({hasText:'Pay Slip'}).getByText('Not submitted',{exact:true}).waitFor();
- await documents.getByRole('row').filter({hasText:'Valid ID'}).getByText('Submitted',{exact:true}).waitFor();
- const evidence=page.getByRole('region',{name:'Consent and witness evidence',exact:true});
- await evidence.getByRole('row').filter({hasText:'Co-maker consent'}).getByText('Not recorded',{exact:true}).waitFor();
- await evidence.getByText('1 of 2 recorded',{exact:true}).waitFor();
- assert.equal(await page.getByRole('button',{name:'Mark as verified',exact:true}).isDisabled(),true);
- await page.screenshot({path:resolve(directory,'process-requirements-incomplete.png'),fullPage:true});
- await page.getByRole('button',{name:'View borrower consent',exact:true}).click();
- let evidenceDialog=page.getByRole('dialog',{name:'Recorded consent & witness evidence',exact:true});
- await evidenceDialog.getByRole('heading',{name:'Terms & Conditions',exact:true}).waitFor();
- await evidenceDialog.getByText('SYNTHETIC-BORROWER-0',{exact:true}).waitFor();
- await evidenceDialog.getByText('SYNTHETIC exact accepted agreement text.',{exact:true}).waitFor();
- assert.equal(await evidenceDialog.getByRole('checkbox').count(),2);
- for(const checkbox of await evidenceDialog.getByRole('checkbox').all()){assert.equal(await checkbox.isChecked(),true);assert.equal(await checkbox.isDisabled(),true);}
- await page.screenshot({path:resolve(directory,'borrower-terms-evidence.png'),fullPage:true});
- await evidenceDialog.getByRole('button',{name:'Close',exact:true}).click();
- await page.getByRole('button',{name:'View witness attestations',exact:true}).click();
- await evidenceDialog.getByText('Synthetic witness 1',{exact:true}).waitFor();
- await evidenceDialog.getByRole('button',{name:'Close',exact:true}).click();
- await page.getByRole('button',{name:'View co-maker consent',exact:true}).click();
- await evidenceDialog.getByText('No saved evidence was found for this application.',{exact:false}).waitFor();
- await evidenceDialog.getByRole('button',{name:'Close',exact:true}).click();
- await page.getByRole('button',{name:'Preview Valid ID',exact:true}).click();
- const documentDialog=page.getByRole('dialog',{name:'Valid ID',exact:true});
- await documentDialog.getByRole('button',{name:'Verify document',exact:true}).evaluate(el=>{el.click();el.click();});
- await documentDialog.waitFor({state:'detached'});
- assert.equal(await page.evaluate(()=>window.documentCalls.length),1);
- await documents.getByRole('row').filter({hasText:'Valid ID'}).getByText('Verified',{exact:true}).waitFor();
- await page.evaluate(()=>{
-   const app=window.verificationData;
-   app.documents.push(window.savedRequirement);
-   app.checks={identity:true,eligibility:true,terms:true};app.blockers=[];
-   app.evidence={borrower:1,coMaker:1,witnesses:2};
-   app.policy={id:'90000000-0000-0000-0000-000000000001',name:'SYNTHETIC APPROVED POLICY',version:1,status:'approved',config:{reviewerCount:3,bodMode:'required',crecomAuthority:'recommendation',borrowerConsentRequired:true,coMakerConsentRequired:true,witnessCount:2,allowedConsentMethods:['otp','paper']},authorizationReference:'SYNTHETIC ONLY',createdBy:'Synthetic coordinator',createdAt:new Date().toISOString()};
- });
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- await page.getByText('2 of 2 required documents submitted · 2 verified',{exact:true}).waitFor();
- await page.screenshot({path:resolve(directory,'process-requirements-complete.png'),fullPage:true});
- await page.getByRole('button',{name:'Mark as verified',exact:true}).click();
- await page.getByRole('dialog',{name:'Mark requirements verified?',exact:true}).getByRole('button',{name:'Mark as verified',exact:true}).click();
- await page.getByRole('button',{name:'Send to CRECOM',exact:true}).waitFor();
- await page.screenshot({path:resolve(directory,'process-ready-for-crecom.png'),fullPage:true});
- const main=page.getByRole('dialog',{name:'Process Application',exact:true});
- assert.equal(await main.locator('.ui-dialog-footer .ui-button--primary').count(),1);
- await page.getByRole('button',{name:'Send to CRECOM',exact:true}).click();
- let confirm=page.getByRole('dialog',{name:'Send to CRECOM',exact:true});
- await confirm.getByLabel('Synthetic CRECOM 1',{exact:false}).check();
- await confirm.getByLabel('Synthetic CRECOM 2',{exact:false}).check();
- await confirm.getByLabel('Synthetic CRECOM 3',{exact:false}).check();
- await confirm.getByRole('button',{name:'Review action',exact:true}).click();
- await confirm.getByRole('button',{name:'Confirm review action',exact:true}).click();
- await page.getByRole('button',{name:'Waiting for CRECOM',exact:true}).waitFor();
- assert.equal(await page.getByRole('button',{name:'Waiting for CRECOM',exact:true}).isDisabled(),true);
- await page.screenshot({path:resolve(directory,'process-crecom-confirmations.png'),fullPage:true});
- await page.evaluate(()=>{
-   const cycle=window.reviewAdmin.cycles.find(cycle=>cycle.stage==='CRECOM');
-   cycle.assignments.slice(0,2).forEach(assignment=>Object.assign(assignment,{state:'decision_recorded',decision:'approve',decidedAt:new Date().toISOString()}));
-   cycle.status='completed';cycle.outcome='approve';
- });
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- assert.equal(await page.getByRole('progressbar',{name:'CRECOM approvals',exact:true}).getAttribute('aria-valuenow'),'2');
- assert.equal(await page.getByRole('button',{name:'Step 2: CRECOM',exact:true}).getAttribute('data-state'),'pending');
- assert.equal(await page.getByRole('button',{name:'Send to BOD',exact:true}).count(),0);
- await page.screenshot({path:resolve(directory,'process-crecom-two-of-three.png'),fullPage:true});
- await page.evaluate(()=>{const cycle=window.reviewAdmin.cycles.find(cycle=>cycle.stage==='CRECOM');cycle.assignments[2].decision='reject';cycle.assignments[2].state='decision_recorded';cycle.outcome='reject';window.verificationData.stage='review_attention';});
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- assert.equal(await page.getByRole('button',{name:'Step 2: CRECOM',exact:true}).getAttribute('data-state'),'rejected');
- assert.equal(await page.getByRole('button',{name:'Send to BOD',exact:true}).count(),0);
- // Simulate the reviewers' separately recorded responses, then reload the real admin UI.
- const complete=async(stage)=>{
-   await page.evaluate(stage=>{
-     const cycle=window.reviewAdmin.cycles.find(cycle=>cycle.stage===stage);cycle.status='completed';cycle.outcome='approve';
-     cycle.assignments.forEach(assignment=>Object.assign(assignment,{state:'decision_recorded',decision:'approve',decidedAt:new Date().toISOString(),confirmationReference:crypto.randomUUID(),confirmationText:'Synthetic recorded confirmation.',confirmationMethod:'account_password'}));
-     window.verificationData.stage=stage==='CRECOM'?'ready_for_bod':'ready_for_final';
-   },stage);
-   await page.getByRole('button',{name:'Refresh',exact:true}).click();
- };
- await complete('CRECOM');
- await page.getByRole('button',{name:'Send to BOD',exact:true}).click();
- confirm=page.getByRole('dialog',{name:'Send to BOD',exact:true});
- await confirm.getByLabel('Synthetic BOD Chairperson',{exact:false}).check();
- await confirm.getByRole('button',{name:'Review action',exact:true}).click();
- await confirm.getByRole('button',{name:'Confirm review action',exact:true}).click();
- await page.getByRole('button',{name:'Waiting for BOD',exact:true}).waitFor();
- assert.equal(await page.getByRole('button',{name:'Waiting for BOD',exact:true}).isDisabled(),true);
- await page.screenshot({path:resolve(directory,'process-bod-waiting.png'),fullPage:true});
- await complete('BOD');
- await page.getByRole('button',{name:'Record final decision',exact:true}).waitFor();
- assert.equal(await page.getByRole('button',{name:'View confirmation',exact:true}).count(),4);
- await page.getByRole('button',{name:'View confirmation',exact:true}).first().click();
- await page.getByRole('dialog',{name:'Recorded committee confirmation',exact:true}).getByText('Confirmed using the reviewer\'s personal account password. This recorded confirmation cannot be edited.',{exact:true}).waitFor();
- await page.getByRole('dialog',{name:'Recorded committee confirmation',exact:true}).getByRole('button',{name:'Close',exact:true}).click();
- await page.screenshot({path:resolve(directory,'process-final-decision.png'),fullPage:true});
- // Admin can view all confirmations but cannot record the final authority's decision.
- await page.evaluate(()=>{window.testRole='admin';});
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- await page.getByRole('button',{name:'Record final decision',exact:true}).waitFor();
- assert.equal(await page.getByRole('button',{name:'Record final decision',exact:true}).isDisabled(),true);
- await page.evaluate(()=>{window.testRole='super_admin';});
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- await page.getByRole('button',{name:'Record final decision',exact:true}).click();
- confirm=page.getByRole('dialog',{name:'Record final decision',exact:true});
- await confirm.getByRole('combobox').selectOption('approve');
- await confirm.getByLabel('Reason',{exact:true}).fill('All four required confirmations reviewed.');
- await confirm.getByRole('button',{name:'Review action',exact:true}).click();
- await confirm.getByRole('button',{name:'Confirm final decision',exact:true}).click();
- await confirm.getByRole('alert').filter({hasText:'account password'}).waitFor();
- await confirm.getByLabel('Your account password',{exact:true}).fill('Synthetic-Password1!');
- await confirm.getByRole('button',{name:'Confirm final decision',exact:true}).click();
- await page.getByRole('button',{name:'Record release',exact:true}).waitFor();
- await page.getByRole('button',{name:'Step 4: Final Decision',exact:true}).click();
- await page.getByRole('region',{name:'Recorded final decision'}).waitFor();
- await page.getByRole('button',{name:'Back to current step',exact:true}).click();
- await page.getByRole('button',{name:'Record release',exact:true}).click();
- const release=page.getByRole('dialog',{name:'Mark loan as released',exact:true});
- await release.getByLabel('Release date',{exact:true}).fill('2026-01-03');
- await release.getByLabel('Disbursement reference / voucher number',{exact:true}).fill('DV-SYNTHETIC-2026-1');
- await release.getByRole('checkbox').check();
- await release.locator('.ui-dialog-body').evaluate(element=>{element.scrollTop=0;});
- await page.screenshot({path:resolve(directory,'process-record-release.png'),fullPage:true});
- await release.getByRole('button',{name:'Review release',exact:true}).click();
- const releaseConfirm=page.getByRole('dialog',{name:'Review release details',exact:true});
- await releaseConfirm.getByLabel('Your account password',{exact:true}).fill('Synthetic-Password1!');
- await releaseConfirm.getByRole('button',{name:'Confirm release',exact:true}).evaluate(el=>{el.click();el.click();});
- const released=page.getByRole('dialog',{name:'Loan release recorded',exact:true});
- await released.waitFor();
- await page.screenshot({path:resolve(directory,'process-released.png'),fullPage:true});
- await released.getByRole('button',{name:'Done',exact:true}).click();
- await page.getByRole('heading',{name:'Loan released',exact:true}).waitFor();
- assert.equal(await page.getByRole('button',{name:'Step 5: Release',exact:true}).getAttribute('data-state'),'complete');
- assert.equal(await page.getByRole('link',{name:'View in Active Loans',exact:true}).getAttribute('href'),'/super-admin/active-loans');
- assert.equal(await page.evaluate(()=>window.reviewCalls.filter(call=>call.reference==='DV-SYNTHETIC-2026-1').length),1);
- assert.equal(await page.getByRole('button',{name:'Record final decision',exact:true}).count(),0);
- assert.equal(await page.evaluate(()=>window.reviewCalls.filter(call=>call.operation==='finalize').length),1);
- await page.setViewportSize({width:390,height:844});
- await page.screenshot({path:resolve(directory,'process-application-mobile.png'),fullPage:true});
- assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
- const footer=await page.locator('.ui-dialog-footer').boundingBox();assert.ok(footer.y+footer.height<=844);
- // Reopening must not make an earlier recorded confirmation disappear from history.
- await page.evaluate(()=>{
-   const previous=structuredClone(window.reviewAdmin.cycles.find(cycle=>cycle.stage==='CRECOM'));
-   previous.id=crypto.randomUUID();previous.status='superseded';previous.cycle=0;
-   previous.assignments.forEach(assignment=>assignment.id=crypto.randomUUID());window.reviewAdmin.cycles.push(previous);
- });
- await page.getByRole('button',{name:'Refresh',exact:true}).click();
- await page.getByText('Processing history & additional actions',{exact:true}).click();
- await page.getByText('Previous committee confirmations',{exact:true}).click();
- await page.getByRole('region',{name:'CRECOM confirmations',exact:true}).last().getByRole('button',{name:'View confirmation',exact:true}).first().click();
- await page.getByRole('dialog',{name:'Recorded committee confirmation',exact:true}).getByText('APP-TEST · Cycle 0 · Packet v1',{exact:true}).waitFor();
- await page.close();
+  await page.goto(`${url}/?workflow=loans`);
+  await page.getByRole("button", { name: "Open actions for APP-TEST", exact: true }).click();
+  const menu = page.getByRole("menu");
+  assert.deepEqual(
+    (await menu.getByRole("menuitem").allTextContents()).map((text) => text.trim()),
+    ["View Details", "Process Application", "Return Application"],
+  );
+  await menu.getByRole("menuitem", { name: "Process Application", exact: true }).click();
+
+  const processing = page.getByRole("dialog", { name: "Process Application", exact: true });
+  await processing.getByRole("navigation", { name: "Application processing steps" }).waitFor();
+  assert.equal(await processing.getByRole("navigation", { name: "Application processing steps" }).getByRole("button").count(), 5);
+  assert.match(await processing.innerText(), /APP-TEST/);
+  assert.match(await processing.innerText(), /Synthetic Maria Cruz/);
+  assert.equal(await processing.getByRole("button", { name: "Start checking", exact: true }).count(), 0);
+  assert.equal(await processing.getByRole("button", { name: "Refresh progress", exact: true }).count(), 0);
+  assert.equal(await processing.getByText("Processing history & additional actions", { exact: true }).count(), 0);
+  assert.equal(await processing.getByRole("button", { name: "Return Application", exact: true }).count(), 0);
+
+  const initialState = await page.evaluate(() => ({
+    calls: window.verificationCalls ?? [],
+    revision: window.verificationData?.revision,
+    stage: window.verificationData?.stage,
+  }));
+  await processing.getByRole("button", { name: "Review Requirements", exact: true }).click();
+  assert.deepEqual(await page.evaluate(() => window.verificationCalls ?? []), initialState.calls);
+  assert.equal(await page.evaluate(() => window.verificationData?.revision), initialState.revision);
+  assert.equal(await page.evaluate(() => window.verificationData?.stage), initialState.stage);
+
+  const verify = processing.getByRole("button", { name: "Verify & Send to CRECOM", exact: true });
+  assert.equal(await verify.isDisabled(), true);
+  for (const label of [
+    "Member identity and application details checked",
+    "Membership eligibility and affordability checked",
+    "Loan amount, term and payment projection checked",
+  ]) await processing.getByLabel(label).check();
+  assert.equal(await verify.isDisabled(), true, "missing consent and policy blockers must still prevent verification");
+
+  await processing.getByRole("button", { name: "View borrower consent", exact: true }).click();
+  const evidence = page.getByRole("dialog", { name: "Recorded consent evidence", exact: true });
+  await evidence.getByText("No saved evidence was found for this application.", { exact: false }).waitFor();
+  assert.equal(await evidence.getByRole("checkbox").count(), 0);
+  await evidence.getByRole("button", { name: "Close", exact: true }).click();
+  await page.screenshot({ path: resolve(directory, "requirements-review.png"), fullPage: true });
+  await processing.getByRole("button", { name: "Close", exact: true }).click();
+  await page.close();
+
+  const successfulPage = await browser.newPage({ viewport: { width: 1366, height: 900 } });
+  successfulPage.on("pageerror", (error) => errors.push(error.message));
+  await successfulPage.addInitScript(() => { window.verificationScenario = "verification-ready"; });
+  await successfulPage.goto(`${url}/?workflow=loans`);
+  await successfulPage.getByRole("button", { name: "Open actions for APP-TEST", exact: true }).click();
+  await successfulPage.getByRole("menuitem", { name: "Process Application", exact: true }).click();
+  const successfulProcessing = successfulPage.getByRole("dialog", { name: "Process Application", exact: true });
+  await successfulProcessing.getByRole("navigation", { name: "Application processing steps" }).waitFor();
+  await successfulProcessing.getByRole("button", { name: "Review Requirements", exact: true }).click();
+  for (const label of [
+    "Member identity and application details checked",
+    "Membership eligibility and affordability checked",
+    "Loan amount, term and payment projection checked",
+  ]) await successfulProcessing.getByLabel(label).check();
+  await successfulProcessing.getByText("Accepted", { exact: true }).waitFor();
+  await successfulProcessing.getByText("Approved", { exact: true }).waitFor();
+  await successfulProcessing.getByText("Names Recorded", { exact: true }).waitFor();
+
+  const send = successfulProcessing.getByRole("button", { name: "Verify & Send to CRECOM", exact: true });
+  assert.equal(await send.isDisabled(), false, "complete approved-policy requirements and recorded evidence must enable verification");
+  await send.click();
+  const confirmation = successfulPage.getByRole("dialog", { name: "Verify requirements and send to CRECOM?", exact: true });
+  await confirmation.getByRole("button", { name: "Continue", exact: true }).click();
+  const identityConfirmation = successfulPage.getByRole("dialog", { name: "Confirm your identity", exact: true });
+  await identityConfirmation.getByRole("textbox", { name: "Your account password" }).fill("synthetic-staff-password");
+  await identityConfirmation.getByRole("button", { name: "Confirm & Send", exact: true }).click();
+  const result = successfulPage.getByRole("dialog", { name: "Action completed", exact: true });
+  await result.getByText("Requirements verified. Application APP-TEST has been sent for CRECOM review.", { exact: true }).waitFor();
+  const committed = await successfulPage.evaluate(() => ({
+    calls: window.verificationCalls ?? [],
+    stage: window.verificationData?.stage,
+    checks: window.verificationData?.checks,
+    cycles: window.reviewAdmin?.cycles ?? [],
+  }));
+  assert.equal(committed.calls.length, 1, "verification should be committed exactly once");
+  assert.equal(committed.calls[0].operation, "verify_and_forward");
+  assert.equal(committed.calls[0].password, "synthetic-staff-password");
+  assert.deepEqual(committed.calls[0].payload.checks, { identity: true, eligibility: true, terms: true });
+  assert.deepEqual(committed.checks, { identity: true, eligibility: true, terms: true });
+  assert.equal(committed.stage, "ready_for_committee");
+  assert.equal(committed.cycles.length, 1, "successful verification must route into one active CRECOM cycle");
+  assert.equal(committed.cycles[0].stage, "CRECOM");
+  assert.equal(committed.cycles[0].status, "open");
+  assert.equal(committed.cycles[0].reviewerTarget, 3);
+  assert.deepEqual(committed.cycles[0].assignments.map(assignment => assignment.signatoryRole), [
+    "crecom_member", "crecom_member", "crecom_chairperson",
+  ]);
+  assert.deepEqual(errors, []);
+  await successfulPage.close();
+
+  for (const role of ["admin", "super_admin"]) {
+    const policy = await browser.newPage({ viewport: { width: role === "admin" ? 390 : 1366, height: 900 } });
+    policy.on("pageerror", (error) => errors.push(error.message));
+    await policy.addInitScript((currentRole) => { window.testRole = currentRole; }, role);
+    await policy.goto(`${url}/?workflow=policy`);
+    await policy.getByRole("button", { name: "Approval Workflow", exact: true }).click();
+    await policy.getByRole("heading", { name: "Approval workflow policy", exact: true }).waitFor();
+    if (role === "admin") {
+      assert.equal(await policy.getByLabel("Policy draft name", { exact: true }).isDisabled(), true);
+      assert.equal(await policy.getByRole("button", { name: "Save policy draft", exact: true }).count(), 0);
+    } else {
+      await policy.getByLabel("Policy draft name", { exact: true }).fill("CSUCC committee workflow draft");
+      await policy.getByLabel("CRECOM reviewers per application", { exact: true }).fill("3");
+      await policy.getByLabel("CRECOM authority", { exact: true }).selectOption("recommendation");
+      await policy.getByRole("button", { name: "Save policy draft", exact: true }).click();
+      await policy.getByRole("button", { name: "Save draft version", exact: true }).click();
+      await policy.getByText("A new policy draft version was saved. Existing application policies were not changed.", { exact: true }).waitFor();
+      assert.equal(await policy.evaluate(() => window.verificationPolicies[0].status), "draft");
+    }
+    await policy.screenshot({ path: resolve(directory, `policy-${role}.png`), fullPage: true });
+    assert.equal(await policy.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+    await policy.close();
+  }
+
+  assert.deepEqual(errors, []);
+  console.log("PASS: read-only and incomplete-evidence checks, successful requirements verification and CRECOM routing, protected action visibility, and role-gated policy editing.");
 }

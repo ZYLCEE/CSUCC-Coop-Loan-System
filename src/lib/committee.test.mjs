@@ -31,12 +31,23 @@ const createClient=(_url,key,options)=>key==="synthetic-service"?service:options
 const sdk={createClient};
 const deadlines=load("./requestDeadline.ts");
 const server=load("./committeeServer.ts",{"@supabase/supabase-js":sdk,"./adminPrivileges":privileges,"./committee":model,"./requestDeadline":deadlines,"./portalActivityServer":{portalActivityHeaders:()=>({})}});
-const management=load("../app/api/admin/committee-accounts/route.ts",{"@/lib/committeeServer":server,"@/lib/requestDeadline":deadlines});
-const portal=load("../app/api/committee/route.ts",{"@supabase/supabase-js":sdk,"@/lib/committeeServer":server,"@/lib/committee":model,"@/lib/profileModel":profile,"@/lib/committeeAuthUpdate":{updateCommitteeAuthUser:async(_context,attributes)=>{const result=await session.auth.updateUser(attributes);if(result.error)throw new server.CommitteeError("The password could not be updated.");}}});
+const management=load("../app/api/admin/committee-accounts/route.ts",{"@/lib/committeeServer":server,"@/lib/requestDeadline":deadlines,"@/lib/committeeCredentialActions":{changeCommitteeCredentials:async()=>({success:true})}});
+const portal=load("../app/api/committee/route.ts",{"@supabase/supabase-js":sdk,"@/lib/committeeServer":server,"@/lib/committee":model,"@/lib/profileModel":profile,"@/lib/committeeProgressServer":load("./committeeProgressServer.ts",{"./committeeServer":server}),"@/lib/committeeAuthUpdate":{updateCommitteeAuthUser:async(_context,attributes)=>{const result=await session.auth.updateUser(attributes);if(result.error)throw new server.CommitteeError("The password could not be updated.");}}});
 process.env.NEXT_PUBLIC_SUPABASE_URL="https://synthetic.example.invalid";process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="synthetic-public";process.env.SUPABASE_SERVICE_ROLE_KEY="synthetic-service";
 const headers={authorization:"Bearer synthetic","content-type":"application/json"};
 const post=(body,path="admin/committee-accounts")=>new Request("https://synthetic.example.invalid/api/"+path,{method:"POST",headers,body:JSON.stringify(body)});
 const invite={operation:"invite",requestId,payload,password:"Synthetic-Password1!"};
+
+test("application progress is never queried before the signed-in review assignment is admitted",async()=>{
+ for(const operation of ["workspace","packet"]){
+  reset();state.role="crecom_member";state.sqlError={code:"42501",message:"Assignment access revoked"};
+  const response=await portal.GET(new Request("https://synthetic.example.invalid/api/committee?operation="+operation+"&assignmentId="+memberId,{headers}));
+  assert.equal(response.status,403);assert.equal(state.calls.some(call=>call.kind==="service-rpc"),false);
+ }
+ reset();state.role="member";
+ assert.equal((await portal.GET(new Request("https://synthetic.example.invalid/api/committee?operation=workspace",{headers}))).status,403);
+ assert.equal(state.calls.some(call=>call.kind==="session-rpc"),false);
+});
 
 test("dedicated creation verifies Super Admin, validates temporary credentials and keeps passwords out of SQL/audits",async()=>{
  reset();const body={...invite,operation:"create",identityVerified:true,credentials:{password:"Temporary-Review1!",confirm:"Temporary-Review1!"}};

@@ -1,5 +1,8 @@
 "use client";
 
+import PasswordInput from "@/components/ui/PasswordInput";
+import {ConfirmActionDialog} from "@/components/ui/ConfirmActionDialog";
+import {ActionResultDialog} from "@/components/ui/ActionResultDialog";
 import { useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, FileCheck2, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/Button";
@@ -20,6 +23,7 @@ export default function DocumentReviewPanel({application,canReview,onBack,onUpda
   const [error,setError]=useState("");
   const [notice,setNotice]=useState("");
   const pending=useRef(false);
+  const [confirm,setConfirm]=useState<"verified"|"needs_replacement"|null>(null),[password,setPassword]=useState(""),[success,setSuccess]=useState("");
   const document=application.documents.find(item=>item.id===selectedId) ?? application.documents[0];
   const latest=document ? latestFileVersion(document) : null;
   const version=document?.versions.find(item=>item.version===versionNumber) ?? latest;
@@ -29,16 +33,18 @@ export default function DocumentReviewPanel({application,canReview,onBack,onUpda
   const current=!!latest && version?.version===latest.version;
   const canReplace=["pending","under review"].includes(application.loanStatus);
   const save=async(status:Exclude<FileReviewStatus,"to_review">)=>{
-    if(pending.current || !document || !version || !current || !canReview)return;
+    if(pending.current || !document || !version || !current || !canReview || !password)return;
     if(status==="needs_replacement" && !reason.trim()){setError("Enter a replacement reason for the member.");return;}
     pending.current=true;setBusy(true);setError("");setNotice("");
     try {
-      await documentsRequest("",{method:"POST",body:JSON.stringify({operation:"review",documentId:document.id,versionId:version.id,expectedReviewId:review?.id ?? null,status,reason})});
-      await onUpdated();setReplacing(false);setReason("");setNotice(status==="verified" ? "Document verified. The decision and reviewer were recorded." : "Replacement requested. The reason and reviewer were recorded.");
+      await documentsRequest("",{method:"POST",body:JSON.stringify({operation:"review",documentId:document.id,versionId:version.id,expectedReviewId:review?.id ?? null,status,reason,password})});
+      await onUpdated();setConfirm(null);setPassword("");setSuccess(status==="verified"?"Document verified.":"Document replacement request recorded.");setReplacing(false);setReason("");setNotice(status==="verified" ? "Document verified. The decision and reviewer were recorded." : "Replacement requested. The reason and reviewer were recorded.");
     } catch(error){setError(error instanceof Error ? error.message : "The review could not be saved.");}
     finally{pending.current=false;setBusy(false);}
   };
   return <div className="space-y-4 p-4 sm:p-6">
+    {confirm&&<ConfirmActionDialog title={confirm==="verified"?"Verify Document":"Request Replacement"} question={confirm==="verified"?"Confirm that this document meets the requirements.":`Request a replacement? Reason: ${reason.trim()}`} confirmLabel={confirm==="verified"?"Confirm Verification":"Confirm Replacement"} disabled={!password} busy={busy} error={error} onClose={()=>{setConfirm(null);setPassword("");}} onConfirm={()=>save(confirm)}><label className="block space-y-2">Your account password<PasswordInput label="Your account password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} disabled={busy}/></label></ConfirmActionDialog>}
+    {success&&<ActionResultDialog success message={success} onClose={()=>setSuccess("")}/>}
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="min-w-0"><Button variant="ghost" size="compact" disabled={busy} onClick={onBack} className="mb-2 -ml-2"><ArrowLeft className="h-4 w-4" />Back to member documents</Button>
         <h2 className="text-section-title">{application.memberName}</h2>
@@ -84,15 +90,15 @@ export default function DocumentReviewPanel({application,canReview,onBack,onUpda
           {review?.reason && <p className="text-support"><span className="font-semibold">Replacement reason: </span>{review.reason}</p>}
           {!current && <p className="text-support text-status-warning">You are viewing an earlier version. Review decisions can be made on the latest version.</p>}
           {canReview ? <div className="flex flex-wrap gap-2">
-            <Button variant="primary" disabled={busy || !current || review?.status==="verified"} onClick={()=>void save("verified")}><CheckCircle2 className="h-4 w-4" />Verify document</Button>
-            <Button disabled={busy || !current || !canReplace} onClick={()=>{setReplacing(true);setError("");setNotice("");}}>Needs replacement</Button>
+            <Button variant="primary" disabled={busy || !current || review?.status==="verified"} onClick={()=>{setConfirm("verified");setPassword("");}}><CheckCircle2 className="h-4 w-4" />Verify Document</Button>
+            <Button disabled={busy || !current || !canReplace} onClick={()=>{setReplacing(true);setError("");setNotice("");}}>Request Replacement</Button>
             <Button variant="ghost" disabled={busy} onClick={onBack}>Done</Button>
           </div> : <p className="text-support text-portal-secondary">Document review permission is required to save verification decisions.</p>}
           {canReview && !canReplace && <p className="text-caption text-portal-secondary">Replacement requests are available while the loan application is Pending or Under Review.</p>}
           {replacing && <div className="space-y-3 rounded-xl border border-portal-border p-3">
             <label htmlFor="document-replacement-reason" className="block text-label">Reason shown to the member <span className="text-status-danger">*</span></label>
             <Textarea id="document-replacement-reason" rows={3} maxLength={2000} disabled={busy} value={reason} onChange={event=>setReason(event.target.value)} placeholder="Explain what is missing, unreadable or incorrect." />
-            <Button variant="primary" loading={busy} disabled={!reason.trim()} onClick={()=>void save("needs_replacement")}>Save replacement request</Button>
+            <Button variant="primary" loading={busy} disabled={!reason.trim()} onClick={()=>{setConfirm("needs_replacement");setPassword("");}}>Continue</Button>
           </div>}
           <section className="border-t border-portal-border pt-4" aria-label="File and review history">
             <h3 className="text-label font-semibold">File and review history</h3>

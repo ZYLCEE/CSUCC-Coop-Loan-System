@@ -71,9 +71,9 @@ export default function LoanReleaseDialog({ applicationId, onClose, onReleased, 
   };
   const eligible = details?.status === 'approved' && details.date_approved && !details.date_released;
   const stepperApplication=processingState?{...processingState.application,loanStatus:saved?"released":processingState.application.loanStatus}:undefined;
-  return <FormDialog icon={HandCoins} dirty={!saved && (draft.date !== initialDate || !!draft.reference || !!draft.notes || confirmed || review)} title="Mark loan as released" titleId="release-loan-title"
+  return <FormDialog icon={HandCoins} dirty={!saved && (draft.date !== initialDate || !!draft.reference || !!draft.notes || confirmed || review)} title="Record Loan Release" titleId="release-loan-title"
     className="max-w-[900px]" overlayClassName={processing?"z-[160]":""} busy={busy} onClose={close}
-    footer={!saved && eligible ? <><Button data-dialog-close disabled={busy}>Cancel</Button><Button type="submit" form="loan-release-form" variant="primary" disabled={!confirmed || busy || review}>Review release</Button></> : undefined}>
+    footer={!saved && eligible ? <><Button data-dialog-close disabled={busy}>Cancel</Button><Button type="submit" form="loan-release-form" variant="primary" disabled={!confirmed || busy || review}>Review Release</Button></> : undefined}>
       {processing&&<ProcessingStepper application={stepperApplication} review={processingState?.review} currentStep={5} released={!!saved} />}
       {!canRelease ? <p role="alert">Your account needs permission to record loan releases.</p> : <>
         {error && <p role="alert" className="mb-4 rounded-lg bg-status-danger-surface p-3 text-sm text-status-danger">{error}</p>}

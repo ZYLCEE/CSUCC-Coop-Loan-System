@@ -69,7 +69,7 @@ function bundle(file) {
     modules.set(file,{index,code:`exports.__esModule=true;exports.default=({src,unoptimized,preload,...props})=>require(${modules.get(react).index}).createElement("img",{...props,src:typeof src==='string'?src:src.src});`});return;
   }
   if (file === "router-stub") {
-    modules.set(file, { index, code: 'exports.usePathname=()=>window.testPathname??window.location.pathname;exports.useRouter=()=>({push:path=>{window.navigationPath=path;},replace:path=>{window.navigationPath=path;}});' }); return;
+    modules.set(file, { index, code: 'exports.useSearchParams=()=>new URLSearchParams(window.location.search);exports.usePathname=()=>window.testPathname??window.location.pathname;exports.useRouter=()=>({push:path=>{window.navigationPath=path;},replace:path=>{window.navigationPath=path;}});' }); return;
   }
   if (file === "accounts-stub") {
     const accounts = readFileSync(resolve(root, "tests/fixtures/accounts.json"), "utf8");
@@ -301,8 +301,8 @@ try {
     const page = await browser.newPage(); await page.goto(url);
     await page.getByRole("button", { name: "Release loan", exact: true }).click();
     await page.getByLabel("Disbursement reference / voucher number").fill("DV-TEST");
-    assert.equal(await page.getByRole("button", { name: "Review release", exact: true }).isDisabled(), true);
-    await page.getByRole("checkbox").check(); await page.getByRole("button", { name: "Review release", exact: true }).click();
+    assert.equal(await page.getByRole("button", { name: "Review Release", exact: true }).isDisabled(), true);
+    await page.getByRole("checkbox").check(); await page.getByRole("button", { name: "Review Release", exact: true }).click();
     const confirmation = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Review release details" }) });
     assert.match(await confirmation.textContent(), /Test member/); assert.match(await confirmation.textContent(), /985\.00/);
     await page.screenshot({ path: resolve(screenshots, "release-review.png") });
@@ -408,16 +408,23 @@ try {
     assert.equal(await page.getByLabel("Official receipt number").inputValue(), "OR-DIRTY");
     await page.close();
   });
-  await test("nested document details restore focus and keep footer actions visible", async () => {
+  await test("loan details keep document previews read-only and the footer close-only", async () => {
     const page = await browser.newPage({ viewport: { width: 390, height: 844 } }); await page.goto(`${url}/?preview`);
     await page.getByRole("button", { name: "Loan details", exact: true }).click();
-    await page.getByRole("heading", { name: "Loan Application Information", exact: true }).waitFor();
-    await page.getByRole("button", { name: "View documents", exact: true }).click();
-    await page.getByText("Synthetic supporting document.pdf", { exact: true }).waitFor();
-    const active = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Application Documents", exact: true }) });
-    const footer = await active.locator(".ui-dialog-footer").boundingBox(); assert.ok(footer.y + footer.height <= 844);
-    await active.locator(".ui-dialog-footer").getByRole("button", { name: "Close", exact: true }).click();
-    assert.equal(await page.getByRole("button", { name: "View documents", exact: true }).evaluate(button => button === document.activeElement), true);
+    const details = page.getByRole("dialog").filter({ has: page.getByRole("heading", { name: "Loan Application Details", exact: true }) });
+    await details.getByRole("heading", { name: "Required documents", exact: true }).waitFor();
+    const detailsFooter = details.locator(".ui-dialog-footer");
+    const detailsFooterBox = await detailsFooter.boundingBox(); assert.ok(detailsFooterBox.y + detailsFooterBox.height <= 844);
+    assert.equal(await detailsFooter.getByRole("button").count(), 1);
+    assert.equal(await detailsFooter.getByRole("button", { name: "Close", exact: true }).count(), 1);
+    assert.equal(await details.getByRole("button", { name: "Process Application", exact: true }).count(), 0);
+    const previewTrigger = details.getByRole("button", { name: "Preview Valid ID", exact: true });
+    await previewTrigger.click();
+    const preview = page.getByRole("dialog").last();
+    await preview.getByRole("heading", { name: "Valid ID", exact: true }).waitFor();
+    assert.equal(await preview.locator(".ui-dialog-footer").getByRole("button").count(), 1);
+    await preview.locator(".ui-dialog-footer").getByRole("button", { name: "Close", exact: true }).click();
+    assert.equal(await previewTrigger.evaluate(button => button === document.activeElement), true);
     await page.keyboard.press("Escape"); await page.getByRole("dialog").waitFor({ state: "detached" });
     await page.close();
   });

@@ -35,7 +35,7 @@ test('existing-account conflicts and incomplete HTTP responses leave actionable 
 test('the management route bounds a stalled verifier and cancels its downstream signal',async()=>{
  let signal,creations=0;
  const server={readCommitteeBody:r=>r.json(),verifiedCommitteeAdministrator:async request=>{signal=request.signal;return new Promise(()=>{});},createCommitteeAccount:async()=>{creations++;},committeeFailure:error=>Response.json({error:error.message},{status:error instanceof deadlines.RequestTimeoutError?504:500})};
- const route=load('../app/api/admin/committee-accounts/route.ts',{'@/lib/committeeServer':server,'@/lib/requestDeadline':fast});
+ const route=load('../app/api/admin/committee-accounts/route.ts',{'@/lib/committeeServer':server,'@/lib/requestDeadline':fast,'@/lib/committeeCredentialActions':{changeCommitteeCredentials:async()=>({success:true})}});
  const response=await route.POST(new Request('https://synthetic.example.invalid/api/admin/committee-accounts',{method:'POST',body:JSON.stringify({operation:'create',password:'Synthetic-Actor1!'})}));
  assert.equal(response.status,504);assert.match((await response.json()).error,/check its status/);assert.equal(signal.aborted,true);assert.equal(creations,0);
 });

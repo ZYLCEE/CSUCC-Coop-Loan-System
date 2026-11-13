@@ -135,7 +135,7 @@ export function SecureAdminActionProvider({
       try {
         return getActionError(await response.clone().json(), fallback);
       } catch {
-        return fallback;
+        return "The action service returned an invalid response. Refresh the page and retry.";
       }
     }
     return getActionError(data, fallback);

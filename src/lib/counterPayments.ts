@@ -13,6 +13,8 @@ export type PaymentLedger = {
   date_released: string | null; principal: number; total_received: number;
   principal_paid: number; principal_remaining: number | null; unallocated_payments: number;
   interest_paid?: number; interest_due?: number; interest_rate_at_release?: number | null;
+  interest_remaining?: number; penalty_paid?: number; penalty_due?: number;
+  penalty_remaining?: number; total_remaining?: number | null;
   processing_fee_amount_at_release?: number | null; service_fee_amount_at_release?: number | null;
   automatic_allocation?: boolean;
   payments: CounterPayment[];

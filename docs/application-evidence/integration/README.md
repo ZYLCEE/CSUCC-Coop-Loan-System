@@ -1,5 +1,12 @@
 # Member app → Supabase → admin evidence integration
 
+**November 12 update:** The running `coop_frontend_client` checkout has now been
+fixed directly while preserving its local changes. See
+[CURRENT_CLIENT_FIX.md](CURRENT_CLIENT_FIX.md) for the missing-evidence diagnosis,
+installed changes and validation. The package instructions below describe the
+separate update for the newer GitHub source layout; do not reapply that patch
+over the corrected local checkout.
+
 This update targets member app commit `5aa01d87e4f32e2f4eb4d33c66c4d5377f16f053`
 from `ZYLCEE/coop-frontend-client` (the GitHub main branch inspected for this task).
 The changed app is prepared in the isolated local branch

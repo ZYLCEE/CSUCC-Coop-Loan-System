@@ -5,18 +5,16 @@ import { DataTable } from "@/components/ui/DataTable";
 import { EmptyState } from "@/components/ui/Feedback";
 
 import { useEffect, useRef, useState } from "react";
-import { CheckCircle2, Eye, FileCheck2, Files, MoreVertical, Undo2 } from "lucide-react";
+import { CheckCircle2, Eye, FileCheck2, MoreVertical, Undo2 } from "lucide-react";
 import { useAdminAuth } from "@/components/auth/AdminAuthProvider";
 import { LoanApplication } from "@/lib/api";
-import { getLoanTypeLabel } from "@/lib/loanTypeLabel";
-import { StatusBadge } from "@/components/ui/StatusBadge";
-import MembershipTypeBadge from "@/components/shared/MembershipTypeBadge";
+import ApplicationTableRow,{ApplicationTableHead} from "./ApplicationTableRow";
 import LoanDetailsModal from "./LoanDetailsModal";
 import LoanDocumentsModal from "./LoanDocumentsModal";
 import LoanReleaseDialog from "./LoanReleaseDialog";
 import ReturnApplicationDialog from "./ReturnApplicationDialog";
 import ProcessApplicationDialog from "./ProcessApplicationDialog";
-import {workflowStageLabels,type WorkflowSummary} from "@/lib/applicationWorkflow";
+import {workflowStageLabel,type WorkflowSummary} from "@/lib/applicationWorkflow";
 
 interface LoanApplicationsTableProps {
   applications: LoanApplication[];
@@ -41,19 +39,6 @@ const formatAmount = (amount: string) => {
   })}`;
 };
 
-const formatDate = (date: string) => {
-  const parsedDate = Date.parse(date);
-
-  if (Number.isNaN(parsedDate)) {
-    return date;
-  }
-
-  return new Date(parsedDate).toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-};
 
 export default function LoanApplicationsTable({
   applications,
@@ -167,72 +152,12 @@ export default function LoanApplicationsTable({
             <col className="w-[12%]" />
             <col className="w-[7%]" />
           </colgroup>
-          <thead>
-            <tr>
-              <th scope="col">
-                Application ID
-              </th>
-              <th scope="col">
-                Member
-              </th>
-              <th scope="col">
-                Loan Type
-              </th>
-              <th scope="col">
-                Membership Type
-              </th>
-              <th scope="col">
-                Amount
-              </th>
-              <th scope="col">
-                Status
-              </th>
-              <th scope="col">
-                Date Applied
-              </th>
-              <th scope="col" className="text-center">
-                Actions
-              </th>
-            </tr>
-          </thead>
+          <ApplicationTableHead/>
           <tbody>
             {applications.length > 0 ? (
               applications.map((application) => (
-                <tr
-                  key={application.id}
-                >
-                  <td className="whitespace-normal text-body font-semibold text-coop-dashboard-green [overflow-wrap:anywhere]" title={application.id}>
-                    {application.id}
-                  </td>
-                  <td>
-                    <p className="whitespace-normal text-body font-semibold text-portal-primary [overflow-wrap:anywhere]" title={application.member}>
-                      {application.member}
-                    </p>
-                    <p className="mt-0.5 whitespace-normal text-caption font-medium text-portal-secondary [overflow-wrap:anywhere]" title={application.memberId}>
-                      {application.memberId || "No member ID"}
-                    </p>
-                  </td>
-                  <td className="whitespace-normal text-body font-normal text-portal-primary [overflow-wrap:anywhere]" title={getLoanTypeLabel(application.type)}>
-                    {getLoanTypeLabel(application.type)}
-                  </td>
-                  <td>
-                    <MembershipTypeBadge
-                      membershipType={application.membershipType}
-                    />
-                  </td>
-                  <td className="whitespace-nowrap text-body font-semibold text-portal-primary tabular-nums" title={application.amount}>
-                    {formatAmount(application.amount)}
-                  </td>
-                  <td>
-                    <StatusBadge status={application.status} />
-                    {workflow[application.id] && <p className="mt-1 text-caption text-portal-secondary">{workflowStageLabels[workflow[application.id].stage]}</p>}
-                  </td>
-                  <td className="whitespace-normal text-body font-normal text-portal-primary" title={application.date}>
-                    {formatDate(application.date)}
-                  </td>
-                  <td>
-                    <div className="flex justify-center">
-                      <button
+                <ApplicationTableRow key={application.id} record={{...application,amount:formatAmount(application.amount),workflowLabel:workflowStageLabel(workflow[application.id],application.status)}}>
+<button
                         type="button"
                         data-loan-action-button="true"
                         onClick={(event) => handleActionButtonClick(application, event)}
@@ -242,10 +167,7 @@ export default function LoanApplicationsTable({
                         aria-expanded={openMenu?.id === application.id}
                       >
                         <MoreVertical className="size-icon" aria-hidden="true" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                      </button>                </ApplicationTableRow>
               ))
             ) : null}
           </tbody>
@@ -269,10 +191,6 @@ export default function LoanApplicationsTable({
             <Eye className="h-4 w-4" />
             View Details
           </button>
-          <button type="button" onClick={() => handleMenuAction("view documents", selectedApplication)}
-            className="ui-button ui-button--compact ui-button--ghost w-full justify-start text-start" role="menuitem">
-            <Files className="h-4 w-4" aria-hidden="true" />View Documents
-          </button>
           <button type="button" role="menuitem" className="ui-button ui-button--compact ui-button--ghost w-full justify-start text-start" onClick={()=>{setOpenMenu(null);setVerificationId(selectedApplication.id);}}>
             <FileCheck2 className="h-4 w-4" aria-hidden="true" />Process Application
           </button>
@@ -283,9 +201,9 @@ export default function LoanApplicationsTable({
             role="menuitem"
           >
             <CheckCircle2 className="h-4 w-4" />
-            Mark as Released
+            Record Loan Release
           </button>}
-          {!readOnly&&can("applications.return")&&selectedApplication.status==="Pending"&&<button type="button" role="menuitem" className="ui-button ui-button--compact ui-button--ghost w-full justify-start text-start" onClick={()=>{setOpenMenu(null);setReturnId(selectedApplication.id);}}><Undo2 className="h-4 w-4" aria-hidden="true" />Return Application</button>}
+          {!readOnly&&can("applications.return")&&["Pending"].includes(selectedApplication.status)&&<button type="button" role="menuitem" className="ui-button ui-button--compact ui-button--ghost w-full justify-start text-start" onClick={()=>{setOpenMenu(null);setReturnId(selectedApplication.id);}}><Undo2 className="h-4 w-4" aria-hidden="true" />Return Application</button>}
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
-import CommitteePacket from "@/components/committee/CommitteePacket";
+import CommitteeWorkspace from "@/components/committee/CommitteeWorkspace";
 export default async function AssignedReviewPage({params}:{params:Promise<{assignmentId:string}>}){
  const {assignmentId}=await params;
- return <CommitteePacket key={assignmentId} assignmentId={assignmentId} />;
+ return <CommitteeWorkspace key={assignmentId} section="assignments" initialAssignmentId={assignmentId}/>;
 }

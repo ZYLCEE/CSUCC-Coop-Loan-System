@@ -18,6 +18,7 @@ export function currentProcessingStep(application:ApplicationVerification, revie
   const stage = review?.verificationStage ?? application.stage;
   if (["ready_for_final","final_approved","final_rejected"].includes(stage)) return 4;
   if (["ready_for_bod","bod_review"].includes(stage)) return 3;
+  if (stage === "review_attention" && review?.cycles.some(cycle=>cycle.status!=="superseded"&&cycle.status==="completed"&&cycle.outcome==="reject") && review.cycles.filter(cycle=>cycle.status!=="superseded").every(cycle=>cycle.status==="completed")) return 4;
   if (stage === "review_attention") {
     return review?.cycles.some(cycle=>cycle.status !== "superseded" && cycle.stage === "BOD") ? 3 : 2;
   }
@@ -44,7 +45,7 @@ export function committeeProgress(review:AdminReviewState|null, stage:"CRECOM"|"
 }
 
 export function processingStepState(step:ProcessingStep,application:ApplicationVerification,review:AdminReviewState|null) {
-  if(step===1)return application.stale||review?.verificationStage==="review_stale"?"attention":review?.verified||["ready_for_committee","crecom_review","bod_review","ready_for_bod","ready_for_final","final_approved","final_rejected"].includes(application.stage)?"complete":"pending";
+  if(step===1)return application.stale||review?.verificationStage==="review_stale"?"attention":review?.verified||["ready_for_committee","crecom_review","bod_review","ready_for_bod","ready_for_final","final_approved"].includes(application.stage)?"complete":"pending";
   if(step===2||step===3){
     const progress=committeeProgress(review,step===2?"CRECOM":"BOD");
     if(application.stale||review?.verificationStage==="review_stale")return "pending";
@@ -67,12 +68,12 @@ export function processingStepDescription(step:ProcessingStep, application:Appli
       : "Start the requirements check, then review the documents and member information.";
   }
   if (!review) return "Review progress could not be loaded. Refresh before continuing.";
-  if (step === 4) return "Review the CRECOM and BOD confirmations. An authorized Admin or Super Admin records the final decision after all four approvals.";
+  if (step === 4) return "Review the CRECOM and BOD confirmations. The Super Admin records final approval after all four approvals, or final rejection after the assigned reviewers respond.";
   const stage = step === 2 ? "CRECOM" : "BOD";
   const cycle = review.cycles.find(cycle=>cycle.stage === stage && cycle.status !== "superseded");
   if (!cycle) return step === 2 ? "Send the verified application to two CRECOM members and one CRECOM chairperson. All three must approve."
     : "CRECOM review is complete. Send the application and recorded confirmations to one BOD chairperson.";
-  if(cycle.outcome === "reject")return "A committee reviewer rejected this application. Read their reason below, then use Return Application to send the member correction instructions.";
+  if(cycle.outcome === "reject")return "A committee reviewer rejected this application. All assigned reviewers must respond. Super Admin can then record final rejection, or authorized staff can use Return Application from the application menu for a fixable issue.";
   const active = cycle.assignments.filter(item=>!["reassigned","cancelled"].includes(item.state));
   const approved = active.filter(item=>item.state === "decision_recorded" && item.decision === "approve").length;
   if (active.some(item=>["awaiting_clarification","recused"].includes(item.state))) return "A reviewer needs clarification or a replacement. Open Reviewer actions below to resolve it.";

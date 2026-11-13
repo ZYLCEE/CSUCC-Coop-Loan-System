@@ -1,5 +1,6 @@
 import {committeeFailure,committeeReply,checkCommitteeError,readCommitteeBody,verifiedCommitteeAdministrator,inviteCommitteeAccount,createCommitteeAccount,sendCommitteeSetupLink,validCommitteeUuid,CommitteeError} from "@/lib/committeeServer";
 import {withRequestDeadline} from "@/lib/requestDeadline";
+import {changeCommitteeCredentials} from "@/lib/committeeCredentialActions";
 export async function GET(request:Request){
  try{
   const {session}=await verifiedCommitteeAdministrator(request),params=new URL(request.url).searchParams;
@@ -20,6 +21,8 @@ export async function POST(request:Request){
   if(typeof body.password!=="string" || !body.password)throw new CommitteeError("Enter your account password.");
   const {session}=await verifiedCommitteeAdministrator(actionRequest,body.password);
   signal.throwIfAborted();
+  if(body.operation==="verify")return committeeReply({verified:true});
+  if(body.operation==="reset"||body.operation==="delete")return committeeReply(await changeCommitteeCredentials(session,actionRequest,body));
   if(body.operation==="create")return committeeReply(await createCommitteeAccount(session,body,actionRequest));
   if(body.operation==="invite")return committeeReply(await inviteCommitteeAccount(session,actionRequest,body));
   if(body.operation==="link")return committeeReply(await sendCommitteeSetupLink(session,actionRequest,body));

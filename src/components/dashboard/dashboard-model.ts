@@ -7,6 +7,7 @@ export interface DashboardLoan {
   id: string;
   member: string;
   memberId: string;
+  membershipType?: "regular" | "associate";
   type: string;
   amount: number;
   status: LoanApplication["status"];

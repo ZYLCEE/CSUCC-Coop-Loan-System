@@ -1,3 +1,4 @@
+import {verifiedAdministratorAction,CommitteeError} from "@/lib/committeeServer";
 import {portalActivityHeaders} from "@/lib/portalActivityServer";
 import { createClient } from "@supabase/supabase-js";
 import { hasAdminPrivilege, isActiveAdministrator } from "@/lib/adminPrivileges";
@@ -50,6 +51,8 @@ async function handle(request: Request) {
     if (request.method === "POST" && body.operation === "review") {
       if (!hasAdminPrivilege(user,"documents.review")) return reply({error:"Document review permission is required."},403);
       if (!uuid(body.documentId) || body.versionId != null && !uuid(body.versionId) || body.expectedReviewId != null && !uuid(body.expectedReviewId)) throw new DocumentServiceError("Choose a valid document review.");
+      const confirmed=await verifiedAdministratorAction(request,body.password,"documents.review");
+      if(confirmed.user.id!==user.id)return reply({error:"Your session changed. Sign in again."},401);
       return reply(await saveDocumentReview(session,body));
     }
     if (request.method === "POST" && body.operation === "publish") {
@@ -75,6 +78,7 @@ async function handle(request: Request) {
     }
     return reply({error:"Unsupported document operation."},405);
   } catch (error) {
+    if(error instanceof CommitteeError)return reply({error:error.message},error.status);
     if (error instanceof DocumentServiceError) return reply({error:error.message},error.status);
     if (error instanceof Error && /^(Choose|Select|Enter|The (replacement reason|description))/.test(error.message)) return reply({error:error.message},400);
     return reply({error:"The document service is temporarily unavailable. Refresh and retry."},503);

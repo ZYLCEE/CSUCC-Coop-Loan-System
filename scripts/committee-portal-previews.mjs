@@ -1,0 +1,82 @@
+import assert from "node:assert/strict";
+import {resolve} from "node:path";
+
+export async function checkCommitteePortal({browser,url,screenshots}){
+ for(const role of ["crecom_member","bod_member"]){
+  const page=await browser.newPage({viewport:{width:1366,height:900}}),errors=[];
+  page.on("pageerror",error=>errors.push(error.message));
+  await page.addInitScript(role=>{window.committeeRole=role;window.committeeLegacyRoot=role==="bod_member";},role);
+  await page.goto(url+"?committee=assignments");
+  await page.getByRole("table").waitFor();
+  assert.deepEqual(await page.locator("thead th").allTextContents(),["Application No.","Borrower","Loan Type","Loan Amount","My Decision","Approval Progress","Actions"]);
+  assert.equal(await page.getByText(/packet|frozen|Group responses/i).count(),0);
+  if(role==="crecom_member")assert.equal(await page.getByText("2 of 3 approved",{exact:true}).count(),9);
+  else assert.equal(await page.getByText("CRECOM: 3 of 3 approved",{exact:true}).count(),10);
+  await page.getByRole("button",{name:"Open actions for APP-OWN-1",exact:true}).click();
+  await page.getByRole("menuitem",{name:"Review Application",exact:true}).click();
+  const review=page.getByRole("dialog",{name:"Review Loan Application",exact:true});
+  await review.getByRole("tab",{name:"Loan Details",exact:true}).waitFor();
+  assert.equal(new URL(page.url()).search,"?committee=assignments");
+  await review.getByRole("tab",{name:"Requirements",exact:true}).click();
+  await review.getByText("Identity and terms verified.",{exact:true}).waitFor();
+  assert.equal(await review.evaluate(el=>el.textContent.includes("\ufffd")),false);
+  await page.screenshot({path:resolve(screenshots,role+"-requirements-desktop.png")});
+  await review.getByRole("button",{name:"View document",exact:true}).click();
+  await page.getByRole("dialog",{name:"Assigned document",exact:true}).getByRole("link",{name:"Open original",exact:true}).waitFor();
+  await page.keyboard.press("Escape");
+  assert.equal(await page.getByRole("dialog").count(),1);
+  assert.equal(await review.getByRole("tab",{name:"Requirements",exact:true}).getAttribute("aria-selected"),"true");
+  await review.getByRole("tab",{name:"Committee Approvals",exact:true}).click();
+  if(role==="bod_member"){await review.getByRole("heading",{name:"CRECOM Approvals - 3 of 3 approved",exact:true}).waitFor();await review.getByText("Synthetic CRECOM Member One",{exact:false}).waitFor();await review.getByText("Synthetic CRECOM Member Two",{exact:false}).waitFor();await review.getByText("Synthetic CRECOM Chair",{exact:false}).waitFor();await page.screenshot({path:resolve(screenshots,"bod-crecom-approvals.png")});}
+  else await review.getByText("Synthetic Member Two",{exact:false}).waitFor();
+  await review.getByRole("tab",{name:"My Decision",exact:true}).click();
+  await review.getByRole("button",{name:"Approve Application",exact:true}).click();
+  await page.getByRole("dialog",{name:"Confirm my approval",exact:true}).waitFor();
+  assert.equal(await page.getByLabel("Your account password",{exact:true}).getAttribute("type"),"password");
+  await page.keyboard.press("Escape");assert.equal(await page.getByRole("dialog").count(),1);
+  await review.getByRole("button",{name:"Close",exact:true}).click();
+  await page.getByRole("button",{name:"Open actions for APP-OWN-2",exact:true}).click();
+  await page.getByRole("menuitem",{name:"View My Decision",exact:true}).click();
+  await review.getByRole("tab",{name:"My Decision",exact:true}).waitFor();
+  assert.equal(await review.getByRole("tab",{name:"My Decision",exact:true}).getAttribute("aria-selected"),"true");
+  await review.getByRole("button",{name:"Close",exact:true}).click();
+  const bell=page.getByRole("button",{name:"My notifications, 1 unread",exact:true});await bell.click();
+  const notifications=page.getByRole("region",{name:"My notifications",exact:true});
+  const desktopBox=await notifications.boundingBox();assert.ok(desktopBox.width<=384);assert.ok(desktopBox.x>=0);
+  await notifications.getByText("Review assigned",{exact:true}).waitFor();
+  await page.keyboard.press("Escape");assert.equal(await notifications.count(),0);assert.equal(await bell.evaluate(el=>el===document.activeElement),true);
+  await bell.click();await page.getByRole("heading",{name:"Loan Applications",exact:true}).click();assert.equal(await notifications.count(),0);
+  await bell.click();
+  await page.evaluate(()=>{window.committeeReadFailure=true;});
+  await notifications.getByRole("button").filter({hasText:"Review assigned"}).click();
+  await notifications.getByRole("alert").filter({hasText:"Unable to mark"}).waitFor();assert.equal(await page.getByRole("dialog").count(),0);
+  await page.evaluate(()=>{window.committeeReadFailure=false;});
+  await notifications.getByRole("button").filter({hasText:"Review assigned"}).click();
+  await review.getByRole("tab",{name:"Loan Details",exact:true}).waitFor();
+  await review.getByRole("button",{name:"Close",exact:true}).click();
+  await page.getByRole("button",{name:"My notifications",exact:true}).waitFor();
+  // Deliver the same recipient-filtered INSERT event used by the live Supabase watcher.
+  await page.evaluate(()=>{window.committeeInbox.push({id:"note-live",title:"New loan assigned",message:"Review the new application.",read:false,createdAt:new Date().toISOString(),assignmentId:"assignment-live",accessAvailable:true});for(const subscription of window.realtimeSubscriptions??[])if(subscription.filter.table==="notifications"&&subscription.filter.event==="INSERT"&&subscription.filter.filter==="user_id=eq.reviewer-own")subscription.callback();});
+  await page.getByRole("button",{name:"My notifications, 1 unread",exact:true}).click();
+  await notifications.getByText("New loan assigned",{exact:true}).waitFor();
+  await page.screenshot({path:resolve(screenshots,role+"-notifications-desktop.png")});
+  await notifications.getByRole("button").filter({hasText:"Assignment changed"}).click();assert.equal(await page.getByRole("dialog").count(),0);
+  await notifications.getByRole("button",{name:"Mark all as read",exact:true}).click();
+  await page.getByRole("button",{name:"My notifications",exact:true}).waitFor();
+  await notifications.getByRole("button",{name:"Unread",exact:true}).click();await notifications.getByText("You're all caught up.",{exact:true}).waitFor();
+  await notifications.getByRole("button",{name:"Close notifications",exact:true}).click();
+  await page.setViewportSize({width:390,height:844});
+  await page.getByRole("button",{name:"My notifications",exact:true}).click();
+  const box=await notifications.boundingBox();assert.ok(box.width<=366&&box.x>=0&&box.x+box.width<=391);
+  await page.screenshot({path:resolve(screenshots,role+"-notifications-mobile.png")});
+  await page.keyboard.press("Escape");
+  await page.getByRole("button",{name:"Open actions for APP-OWN-1",exact:true}).click();await page.getByRole("menuitem",{name:"Review Application",exact:true}).click();
+  await review.getByRole("tab",{name:"Requirements",exact:true}).click();
+  await page.screenshot({path:resolve(screenshots,role+"-requirements-mobile.png")});
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),true);
+  await review.getByRole("tab",{name:"My Decision",exact:true}).click();await review.getByRole("button",{name:"More options",exact:true}).click();await review.getByRole("button",{name:"Unable to Review",exact:true}).click();
+  await page.getByRole("dialog",{name:"Unable to Review",exact:true}).waitFor();assert.equal(await page.getByRole("dialog").count(),2);
+  assert.deepEqual(errors,[]);await page.close();
+ }
+ console.log("PASS: CRECOM/BOD contextual actions, review tabs, nested previews/security, live recipient notifications, persistent read state, errors, revoked access and mobile layout.");
+}

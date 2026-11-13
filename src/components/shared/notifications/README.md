@@ -9,6 +9,9 @@ Updated November 11, 2026: see [role-specific activity notifications](../../../.
   small widths. The sidebar logout and authentication code are unchanged.
 - `NotificationPopover.tsx`: recent dropdown and in-place expanded notification
   center, keyboard/outside dismissal, search, filters and persisted read controls.
+- `../../committee/CommitteeNotificationBell.tsx`: committee inbox popover using
+  the same header-bell, card, unread, filter, and responsive panel presentation,
+  while retaining committee-specific assignment access.
 - `useNotificationInbox.ts`: recipient-scoped request lifecycle, pagination,
   refresh-on-open, persisted actions and stale-response protection.
 - `src/lib/adminNotifications.ts`: existing Supabase table operations, record and
@@ -22,6 +25,15 @@ Updated November 11, 2026: see [role-specific activity notifications](../../../.
 - `src/app/(admin)/notifications/page.tsx`: member-notification composition and
   history layout, with a history refresh after protected requests complete.
 - `src/lib/memberNotifications.test.mjs`: outgoing contracts and isolation tests.
+
+## Shared portal appearance
+
+Admin, Super Admin, CRECOM, and BOD use the same bell treatment, unread badge,
+card surface, header controls, filter group, notification row styling, and bounded
+popover sizing. The committee bell keeps its own authenticated inbox request and
+opens an assignment only when the returned record confirms access. Matching the
+presentation does not share inbox data, widen recipient access, or alter role
+destinations.
 
 ## Existing backend capabilities reused
 

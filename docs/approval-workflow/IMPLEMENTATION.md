@@ -2,13 +2,28 @@
 
 Implementation in progress. Scope: Pending → requirements → all three CRECOM confirmations → BOD confirmation → password-confirmed final staff decision → separate release. Returned applications require a reason and the acting staff account password. Resubmission starts a new requirements check and four fresh confirmations; old evidence remains in history.
 
-Committee accounts remain separate from members. Each reviewer uses the shared login and a role-specific portal. Every decision requires the reviewer's own password. The live workflow is enforced by database procedures as well as the interface. Existing approved/released loans retain their history.
+The read-only application details view and application list display workflow stages. Returned applications without a verification record are labeled "Returned for requirements"; stale packets are labeled "Packet needs re-verification" rather than presented as ready for the next step.
 
-The user selected **Configure email delivery later**. Returns create in-app notices and an email outbox record; no email is reported as sent without a configured delivery service.
+Committee accounts remain separate from members. Each reviewer uses the shared login and a role-specific portal. Every decision requires the reviewer's own password. The linked Supabase project is confirmed as production, but read-only catalog checks found required local objects missing and several existing functions with bodies that differ from local definitions. The live workflow is therefore not verified as complete. Existing approved/released loans retain their history in the local workflow.
 
-Work items:
-- [ ] Database status, return/resubmit boundaries, committee routing and final approval permissions.
-- [ ] Password-confirmed staff API actions and dedicated committee account creation.
-- [ ] Pending/Returned administration and member corrections/resubmission.
-- [ ] Cooperative-branded committee portals, dashboard, history and notifications.
-- [ ] Integration/security tests, visual checks, deployment verification and handover.
+The user selected **Configure email delivery later**. The local workflow creates in-app notices and an email outbox record on return; no email is reported as sent without a configured delivery service.
+
+## Implementation and verification status
+
+| Workstream | Local evidence | Status |
+|---|---|---|
+| Database status transitions, requirements return, CRECOM/BOD routing, and final-decision gates | `supabase/migrations/20261112090000_allow_return_before_verification.sql`, `supabase/migrations/20261112100000_allow_requirements_return_transition.sql`, `supabase/repairs/20261113172300_restore_application_return_email_outbox.sql`, `supabase/migrations/20261113090000_portal_workflow_improvements.sql`; offline PostgreSQL checks in `scripts/requirements-return-sql.test.mjs`, `scripts/bod-handoff-sql.test.mjs`, and `scripts/portal-workflow-sql.test.mjs` | Return failure was caused by the production RPC writing to a missing `application_email_outbox` table. The focused repair was applied and verified in production; an actual loan return was not performed. The frontend error-message improvement is local only, email delivery remains unconfigured, and other production workflow gaps remain. The one-off SQL is intentionally outside the auto-pushed migration folder and is not recorded in the ambiguous migration ledger. |
+| Password-confirmed staff actions and committee-account administration | `src/app/api/admin/application-workflow/route.ts`, `src/app/api/admin/action/route.ts`, `src/app/api/admin/committee-accounts/route.ts`; `scripts/committee-account-actions-sql.test.mjs` | Implemented locally. Production has the earlier committee dispatch/read/edit RPCs, but lacks the credential-action table, two membership columns, and the newer credential-action RPCs; those repairs have not been applied. |
+| Pending/Returned staff workflow and member corrections/resubmission | `src/components/loan-applications/ProcessApplicationDialog.tsx`, `src/components/loan-applications/ReturnApplicationDialog.tsx`, and the member-app integration package under `docs/application-evidence/integration/` | Local implementation and integration artifacts exist; verification against a deployed pair of apps is outstanding. |
+| Committee portals, dashboard, history, and notifications | `src/components/committee/`, `src/components/dashboard/`, and `scripts/committee-portal-previews.mjs` | Implemented locally; browser previews use synthetic data and do not establish hosted behavior. The production dashboard totals RPC and notification/outbox additions are missing. |
+| Email notification delivery | `supabase/migrations/20261113091000_portal_borrower_notifications.sql`, `scripts/application-email-worker.mjs`, and `scripts/application-email-worker.test.mjs` | Queue and worker are implemented locally. The selected scope defers provider configuration; no email is claimed sent. |
+| Specification audit, hosted reconciliation, deployment verification, and handover | Original 25-section instruction; `SPECIFICATION_AUDIT.md`; `SUPABASE_FORWARD_RECONCILIATION.md` | The 25-section audit and production read-only baseline are documented. Exact full-schema/grant/policy reconciliation, mapping of the remaining migrations, resolving duplicate local versions, a tested forward-only repair, and post-apply verification are still outstanding. Replaying the migration directory is unsafe; no live-completion claim is supported. |
+
+These are separate claims: local source and synthetic tests can establish local behavior, but they do not prove that the linked Supabase project has the same schema or functions. No hosted migration, deployment, or real email delivery is recorded as completed here.
+
+See the [25-section specification audit](./SPECIFICATION_AUDIT.md) and [forward-only Supabase reconciliation plan](./SUPABASE_FORWARD_RECONCILIATION.md) for requirement-level status, verified migration-history evidence, remaining gaps, and the execution gate.
+
+
+## Approved rejection repair � November 13, 2026
+
+The owner separately approved the rejection-only repair after the UI reported a missing workflow function. `supabase/migrations/20261113100000_application_rejection_resolution.sql` was applied individually. The dedicated `portal_reject_application` dispatcher is now exposed in the connected API and callable only by the server role; the API still verifies the acting Super Admin's current password. Read-only fingerprints confirmed application rows, individual committee decisions, and final decisions were unchanged. No loan decision was submitted. See `docs/portal-improvements/REJECTION_REPAIR.md` and its verification artifacts. This does not establish that the broader pending workflow, dashboard or email changes have been deployed.
