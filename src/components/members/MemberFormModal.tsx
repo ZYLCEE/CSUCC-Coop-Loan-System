@@ -566,9 +566,9 @@ export default function MemberFormModal({
                     }
                   >
                     {showTemporaryPassword ? (
-                      <EyeOff className="h-4 w-4" aria-hidden="true" />
-                    ) : (
                       <Eye className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
                     )}
                   </button>
                 </div>
@@ -610,9 +610,9 @@ export default function MemberFormModal({
                     }
                   >
                     {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" aria-hidden="true" />
-                    ) : (
                       <Eye className="h-4 w-4" aria-hidden="true" />
+                    ) : (
+                      <EyeOff className="h-4 w-4" aria-hidden="true" />
                     )}
                   </button>
                 </div>

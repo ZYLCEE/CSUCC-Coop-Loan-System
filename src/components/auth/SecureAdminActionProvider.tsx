@@ -59,6 +59,7 @@ export function SecureAdminActionProvider({
   const [grant, setGrant] = useState<string | null>(null);
   const [securityPassword, setSecurityPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [passwordEntryReady, setPasswordEntryReady] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{
     success: boolean;
@@ -80,6 +81,8 @@ export function SecureAdminActionProvider({
     setStage("security");
     setGrant(null);
     setSecurityPassword("");
+    setShowPassword(false);
+    setPasswordEntryReady(false);
     setError("");
     setResult(null);
   };
@@ -89,6 +92,7 @@ export function SecureAdminActionProvider({
     setGrant(null);
     setSecurityPassword("");
     setShowPassword(false);
+    setPasswordEntryReady(false);
     setError("");
     setResult(null);
     busyRef.current = false;
@@ -103,6 +107,7 @@ export function SecureAdminActionProvider({
     setGrant(null);
     setSecurityPassword("");
     setShowPassword(false);
+    setPasswordEntryReady(false);
     setError("");
     setResult(null);
   };
@@ -252,7 +257,6 @@ export function SecureAdminActionProvider({
   };
 
   const visible = enabled && !!request && (role === "super_admin" || (request.action === "send-notification" && can("notifications.send")));
-  const passwordInput = useRef<HTMLInputElement>(null);
   const tone = request?.action === "delete-account" || request?.action === "block-account" || request?.action === "reject-loan" ? "destructive" : "primary";
 
   return (
@@ -269,14 +273,14 @@ export function SecureAdminActionProvider({
             <label className="block space-y-1.5">
               <span className="text-label">{request.securityTitle ? "Your Super Admin Password" : "Password"} <span className="text-status-danger">*</span></span>
               <span className="relative block">
-                <Input ref={passwordInput} data-dialog-autofocus required disabled={busy} aria-invalid={!!error}
+                <Input required disabled={busy} readOnly={!passwordEntryReady} name="secure-action-confirmation" autoComplete="off" onFocus={() => setPasswordEntryReady(true)} aria-invalid={!!error}
                   aria-describedby={error ? "secure-action-password-error" : undefined}
-                  type={showPassword ? "text" : "password"} autoComplete="current-password"
+                  type={showPassword ? "text" : "password"}
                   value={securityPassword} onChange={event => setSecurityPassword(event.target.value)} className="w-full pr-11" />
                 <button type="button" disabled={busy} onClick={() => setShowPassword(visible => !visible)}
                   className="ui-icon-button ui-button--ghost absolute inset-y-0 end-0 border-transparent"
                   aria-label={showPassword ? "Hide password" : "Show password"}>
-                  {showPassword ? <EyeOff className="size-icon-compact" aria-hidden="true" /> : <Eye className="size-icon-compact" aria-hidden="true" />}
+                  {showPassword ? <Eye className="size-icon-compact" aria-hidden="true" /> : <EyeOff className="size-icon-compact" aria-hidden="true" />}
                 </button>
               </span>
             </label>

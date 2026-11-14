@@ -24,7 +24,8 @@ function date(value: unknown): string {
 
 function parseLoan(value: unknown): DashboardLoan {
   const row = record(value);
-  const status = typeof row.status === "string" ? statuses[row.status.toLowerCase()] : undefined;
+  const statusValue = typeof row.status === "string" ? row.status.toLowerCase().replaceAll("_", " ") : "";
+  const status = statuses[statusValue];
   const amount = typeof row.amount === "number" ||
     (typeof row.amount === "string" && /^\d+(\.\d{1,2})?$/.test(row.amount))
     ? Number(row.amount) : NaN;
@@ -37,6 +38,8 @@ function parseLoan(value: unknown): DashboardLoan {
   }
   const related = Array.isArray(row.members) ? row.members[0] : row.members;
   const member = related ? record(related) : null;
+  const verification = row.verification;
+  const hasVerification = Array.isArray(verification) ? verification.length > 0 : verification !== null && verification !== undefined;
   const name = member ? [member.first_name, member.last_name]
     .filter((part) => typeof part === "string" && part.trim()).join(" ") : "";
   return {
@@ -47,6 +50,7 @@ function parseLoan(value: unknown): DashboardLoan {
     type: row.loan_type,
     amount,
     status,
+    isInitialPending: statusValue === "pending" && !hasVerification,
     submittedAt: date(row.date_submitted),
     approvedAt: row.date_approved === null ? null : date(row.date_approved),
     releasedAt: row.date_released === null ? null : date(row.date_released),
@@ -63,7 +67,7 @@ export async function fetchDashboardLoans(): Promise<DashboardLoan[]> {
   let offset = 0;
   do {
     const { data, error, count } = await client.from("loan_applications")
-      .select("application_id,member_name,loan_type,amount,status,date_submitted,date_approved,date_released,created_at,members:members!loan_applications_member_id_fkey(member_id,first_name,last_name,membership_type)", { count: "exact" })
+      .select("application_id,member_name,loan_type,amount,status,date_submitted,date_approved,date_released,created_at,members:members!loan_applications_member_id_fkey(member_id,first_name,last_name,membership_type),verification:application_verifications!application_verifications_application_id_fkey(application_id)", { count: "exact" })
       .order("date_submitted", { ascending: false })
       .order("created_at", { ascending: false })
       .order("application_id", { ascending: true })

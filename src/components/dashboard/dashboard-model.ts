@@ -11,6 +11,7 @@ export interface DashboardLoan {
   type: string;
   amount: number;
   status: LoanApplication["status"];
+  isInitialPending?: boolean;
   submittedAt: string;
   approvedAt: string | null;
   releasedAt: string | null;
@@ -114,7 +115,7 @@ export function summarizeLoans(loans: DashboardLoan[], range: ReportRange) {
     }
   }
   return {
-    pending: uniqueLoans.filter((loan) => loan.status === "Pending").length,
+    pending: uniqueLoans.filter((loan) => loan.isInitialPending ?? loan.status === "Pending").length,
     disbursement: releaseDatesMissing || !Number.isSafeInteger(disbursementCents)
       ? null : disbursementCents / 100,
     approvalDatesMissing,

@@ -38,7 +38,7 @@ export default function CommitteeReviewPanel({applicationId,onUpdated}:{applicat
    {current.length>0&&<Button onClick={()=>setAction({operation:"reopen"})}>Return to verification</Button>}
   </div>}
   {data.canFinalize&&<Button variant="primary" onClick={()=>setAction({operation:"finalize"})}>Record final decision</Button>}
-  {data.finalDecision&&<div className="space-y-2 rounded-lg border border-portal-border p-3 text-support"><StatusBadge status={data.finalDecision.decision==="approve"?"approved":"rejected"} /><p>{data.finalDecision.actor} · {committeeDate(data.finalDecision.createdAt)}</p><p className="whitespace-pre-wrap break-words text-portal-secondary">{data.finalDecision.reason}</p></div>}
+  {data.finalDecision&&<div className="space-y-2 rounded-lg border border-portal-border p-3 text-support"><StatusBadge status={data.finalDecision.decision==="approve"?"approved":"rejected"} /><p>{data.finalDecision.actor} · {committeeDate(data.finalDecision.createdAt)}</p>{data.finalDecision.decision==="reject"&&<p className="whitespace-pre-wrap break-words text-portal-secondary">{data.finalDecision.reason}</p>}</div>}
   {!data.verified&&!current.length&&data.blockers.length>0&&<div><p className="text-support font-medium">Needed before forwarding</p><ul className="mt-2 list-disc space-y-1 pl-5 text-caption text-portal-secondary">{data.blockers.map(item=><li key={item}>{displayVerificationBlocker(item)}</li>)}</ul></div>}
   {data.cycles.map(cycle=><section key={cycle.id} className="overflow-hidden rounded-lg border border-portal-border">
    <div className="flex flex-wrap justify-between gap-2 bg-surface-muted p-3 text-support"><h4 className="font-semibold">{cycle.stage} · Cycle {cycle.cycle} · Packet v{cycle.packetVersion}</h4><span className="capitalize">{cycle.status}{cycle.outcome?" · "+cycle.outcome:""}</span></div>
@@ -76,16 +76,17 @@ export function ReviewActionDialog({data,action,onClose,onSaved}:{data:AdminRevi
   if(forwarding&&(selected.length!==required||!required)){setError("Choose exactly "+required+" eligible reviewers.");return;}
   if(action.operation==="forward"&&(eligible.filter(item=>selected.includes(item.id)&&item.committeeSeat==="member").length!==2||eligible.filter(item=>selected.includes(item.id)&&item.committeeSeat==="chairperson").length!==1)){setError("Choose exactly two CRECOM members and one CRECOM chairperson.");return;}
   if(action.operation==="forward"&&new Set(eligible.filter(item=>selected.includes(item.id)&&item.committeeSeat==="member").map(item=>item.committeeMemberNumber).filter(Boolean)).size!==2){setError("Choose CRECOM Member 1, CRECOM Member 2 and the CRECOM Chairperson. Set missing positions in Committee Accounts first.");return;}
-  if(!forwarding&&!reason.trim()){setError("Enter a reason or clarification.");return;}
+  if(!forwarding&&(action.operation!=="finalize"||decision==="reject")&&!reason.trim()){setError("Enter a reason or clarification.");return;}
   if(action.operation==="reassign"&&!replacement){setError("Choose an eligible replacement reviewer.");return;}
   if(due&&Date.parse(due+"T23:59:59+08:00")<=Date.now()){setError("Choose a future deadline.");return;}
   setReview(true);
  };
  const save=async()=>{
   if(pending.current)return;
+  if(action.operation==="finalize"&&decision==="reject"&&!reason.trim()){setError("Enter a rejection reason.");return;}
   if(!password){setError("Enter your account password.");return;}
   const payload=forwarding?{reviewers:selected,dueAt:due?due+"T23:59:59+08:00":null,...(action.operation==="forward"?{bodRequired:true,routingReason:"BOD chairperson confirmation required for every loan."}:{})}:
-   {reason:reason.trim(),...(action.assignment?{assignmentId:action.assignment.id}:{}),...(action.operation==="reassign"?{membershipId:replacement}:{}),...(action.operation==="finalize"?{decision}:{})};
+   {reason:action.operation==="finalize"&&decision==="approve"?(reason.trim()||"Approved"):reason.trim(),...(action.assignment?{assignmentId:action.assignment.id}:{}),...(action.operation==="reassign"?{membershipId:replacement}:{}),...(action.operation==="finalize"?{decision}:{})};
   pending.current=true;setSubmitted(true);setBusy(true);setError("");
   try{
    const reject=action.operation==="finalize"&&decision==="reject";
@@ -94,9 +95,9 @@ export function ReviewActionDialog({data,action,onClose,onSaved}:{data:AdminRevi
   }catch(error){setError(error instanceof Error?error.message:"The review action failed. Refresh and retry.");}
   finally{pending.current=false;setBusy(false);setPassword("");}
  };
- if(success)return <ActionResultDialog success title="Review action recorded" message={`${labels[action.operation]} was recorded for ${data.applicationId}.`} overlayClassName="z-[160]" onClose={()=>{void onSaved();}}/>;
+ if(success)return <ActionResultDialog success title={action.operation==="finalize"?"Final decision recorded":"Review action recorded"} message={`${labels[action.operation]} was recorded for ${data.applicationId}.`} overlayClassName="z-[160]" onClose={()=>{void onSaved();}}/>;
  const failedRequiredPanel=data.cycles.some(item=>item.status!=="superseded"&&item.outcome==="reject");
- return <ActionDialog title={labels[action.operation]} subtitle={data.applicationId} onClose={onClose} busy={busy} className="max-w-xl" overlayClassName="z-[160]" footer={<><Button disabled={busy} onClick={onClose}>Cancel</Button>{review?<Button variant="primary" loading={busy} onClick={()=>void save()}>Confirm {action.operation==="finalize"?"final decision":"review action"}</Button>:<Button variant="primary" onClick={prepare}>Review action</Button>}</>}>
+ return <ActionDialog title={labels[action.operation]} subtitle={data.applicationId} onClose={onClose} busy={busy} className="max-w-xl" overlayClassName="z-[160]" footer={<><Button disabled={busy} onClick={onClose}>Cancel</Button>{action.operation==="finalize"?<Button variant="primary" disabled={busy||!password||(decision==="reject"&&!reason.trim())} loading={busy} onClick={()=>void save()}>Confirm Final Decision</Button>:review?<Button variant="primary" loading={busy} onClick={()=>void save()}>Confirm review action</Button>:<Button variant="primary" onClick={prepare}>Review action</Button>}</>}>
   <div className="space-y-4 text-support">
    {!review?<>
     {forwarding&&<><p>{action.stage==="CRECOM"?"Select two CRECOM members and one CRECOM chairperson.":"Select one BOD chairperson."} Their confirmations will refer to this verified packet.</p><div className="max-h-52 space-y-2 overflow-y-auto rounded-lg border border-portal-border p-3">{eligible.length?eligible.map(item=><label key={item.id} className="flex items-center gap-2"><input type="checkbox" checked={selected.includes(item.id)} disabled={selected.length===(required??0)&&!selected.includes(item.id)} onChange={event=>setSelected(current=>event.target.checked?[...current,item.id]:current.filter(id=>id!==item.id))} /><span>{item.name}<span className="ml-1 text-caption text-portal-secondary">· {committeePositionLabel(item.role,item.committeeSeat,item.committeeMemberNumber)}</span></span></label>):<p className="text-portal-secondary">No eligible reviewers. Invite and complete their account setup in Committee Accounts first.</p>}</div>
@@ -104,8 +105,9 @@ export function ReviewActionDialog({data,action,onClose,onSaved}:{data:AdminRevi
      {action.operation==="forward"&&<p className="text-caption text-portal-secondary">After all three CRECOM approvals, the active BOD chairperson receives the application automatically. If an appointment needs selection, staff can assign the chairperson. BOD confirmation is required for every loan.</p>}
     </>}
     {action.operation==="reassign"&&<CommitteeField label="Replacement reviewer"><Select value={replacement} onChange={event=>setReplacement(event.target.value)}><option value="">Choose the same approval position</option>{eligible.map(item=><option key={item.id} value={item.id}>{item.name} · {committeePositionLabel(item.role,item.committeeSeat,item.committeeMemberNumber)}</option>)}</Select></CommitteeField>}
-    {action.operation==="finalize"&&<CommitteeField label="Final decision"><Select value={decision} onChange={event=>setDecision(event.target.value)}><option value="reject">Reject application</option><option value="approve" disabled={failedRequiredPanel}>Approve application{failedRequiredPanel?" (required panel did not approve)":""}</option></Select></CommitteeField>}
-    {!forwarding&&<CommitteeField label={action.operation==="reply"?"Clarification provided":"Reason"}><Textarea maxLength={2000} rows={3} value={reason} onChange={event=>setReason(event.target.value)} /></CommitteeField>}
+    {action.operation==="finalize"&&<CommitteeField label="Final decision"><Select value={decision} onChange={event=>{setDecision(event.target.value);if(event.target.value==="approve")setReason("");}}><option value="reject">Reject application</option><option value="approve" disabled={failedRequiredPanel}>Approve application{failedRequiredPanel?" (required panel did not approve)":""}</option></Select></CommitteeField>}
+    {!forwarding&&(action.operation!=="finalize"||decision==="reject")&&<CommitteeField label={action.operation==="reply"?"Clarification provided":"Reason"}><Textarea maxLength={2000} rows={3} value={reason} onChange={event=>setReason(event.target.value)} /></CommitteeField>}
+    {action.operation==="finalize"&&<CommitteeField label="Your account password"><PasswordInput label="Your account password" autoComplete="current-password" value={password} onChange={event=>setPassword(event.target.value)} disabled={busy}/></CommitteeField>}
     {action.operation==="reopen"&&<p className="text-caption text-portal-secondary">Existing decisions stay in history. Current assignments close. Verification will use the current approved policy, and a new verified packet and review cycle will be required.</p>}
    </>:<>
     <p className="font-semibold">{labels[action.operation]} · {data.applicationId}</p>

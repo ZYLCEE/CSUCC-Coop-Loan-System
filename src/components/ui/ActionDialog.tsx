@@ -57,7 +57,7 @@ function DialogPanel({ title, titleId, subtitle, children, footer, onClose, busy
             {subtitle && <p id={`${id}-description`} className="mt-1 break-words text-support text-portal-secondary">{subtitle}</p>}
           </div>
         </div>
-        {showClose && <button type="button" className="ui-icon-button ui-button--ghost" aria-label={closeLabel ?? `Close ${title}`} disabled={busy} onClick={close}>
+        {showClose && <button type="button" className="ui-icon-button ui-button--ghost ui-dialog-close" aria-label={closeLabel ?? `Close ${title}`} disabled={busy} onClick={close}>
           <X className="size-icon" aria-hidden="true" />
         </button>}
       </header>

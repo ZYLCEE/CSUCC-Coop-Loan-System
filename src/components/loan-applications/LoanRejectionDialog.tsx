@@ -65,7 +65,7 @@ export default function LoanRejectionDialog({ application, onClose, onRejected }
           value={reason} onChange={event => setReason(event.target.value)} placeholder="Enter the reason this loan application is being rejected..."
           aria-invalid={!!error} aria-describedby={`loan-rejection-privacy${error ? " loan-rejection-error" : ""}`} />
       </label>
-      <p id="loan-rejection-privacy" className="text-xs leading-5 text-portal-muted">This reason is for authorized administrative records. The member notification contains only the decision.</p>
+      <p id="loan-rejection-privacy" className="text-xs leading-5 text-portal-muted">This reason will be shared with the member so they understand the decision.</p>
       {error && <p id="loan-rejection-error" role="alert" className="ui-action-feedback ui-action-feedback--error">{error}</p>}
       <p className="rounded-lg bg-status-warning-surface p-3 text-sm leading-6 text-status-warning">{rejectionWarning}</p>
     </form>

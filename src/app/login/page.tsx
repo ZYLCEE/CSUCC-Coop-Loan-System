@@ -145,7 +145,7 @@ export default function AdminLoginPage() {
             />
           </div>
           <h1 id="portal-title" className={styles.title}>
-            <span>CSUCC</span> ERMPC Admin Portal
+            <span>CSUCC</span> ERMPC Management Portal
           </h1>
           <p className={styles.tagline}>
             Empowering efficient and secure cooperative management.
@@ -155,7 +155,7 @@ export default function AdminLoginPage() {
         <form className={styles.card} onSubmit={submit} aria-labelledby="login-heading">
           <header className={styles.cardHeader}>
             <h2 id="login-heading">Log In</h2>
-            <p>Sign in to access your administrative dashboard.</p>
+            <p>Sign in to access your management dashboard.</p>
           </header>
 
           <div className={styles.field}>

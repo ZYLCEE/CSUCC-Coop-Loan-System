@@ -19,7 +19,7 @@ export default function DashboardPage() {
   const pathname = usePathname();
   const [period, setPeriod] = useState<ReportingPeriod>("this-month");
   const range = getReportRange(period);
-  const { loans, activeMembers, financials, connected } = useDashboardData(range);
+  const { loans, activeMembers, collections, disbursement, connected } = useDashboardData(range);
   const { finish } = useLoginTransition();
   const dashboardReady = !loans.loading && !activeMembers.loading;
 
@@ -60,11 +60,12 @@ export default function DashboardPage() {
       </PortalPageHeading>
       <div className="ui-card-padding min-w-0 space-y-portal-section">
       {!connected&&<p role="status" className="text-support text-status-warning">Live updates interrupted. Reconnecting. Data is checked automatically; you can retry any unavailable report.</p>}
-      <DashboardMetrics pending={financials.data?.pending ?? null} activeMembers={activeMembers.data}
-        collections={financials.data?.collections ?? null} disbursement={financials.data?.disbursement ?? null} period={period}
-        financialsLoading={financials.loading} membersLoading={activeMembers.loading}
-        financialsError={financials.error} membersError={activeMembers.error}
-        retryFinancials={financials.retry} retryMembers={activeMembers.retry} />
+      <DashboardMetrics pending={summary?.pending ?? null} activeMembers={activeMembers.data}
+        collections={collections.data} disbursement={disbursement.data} period={period}
+        pendingLoading={loans.loading} pendingError={loans.error} retryPending={loans.retry}
+        collectionsLoading={collections.loading} collectionsError={collections.error} retryCollections={collections.retry}
+        disbursementLoading={disbursement.loading} disbursementError={disbursement.error} retryDisbursement={disbursement.retry}
+        membersLoading={activeMembers.loading} membersError={activeMembers.error} retryMembers={activeMembers.retry} />
       <ChartsSection data={summary?.trends} loanTypes={loanTypes} loading={loans.loading} error={loans.error}
         periodLabel={range.label} approvalDatesMissing={summary?.approvalDatesMissing} onRetry={loans.retry} />
       <RecentApplications applications={summary?.recent} loading={loans.loading} error={loans.error}

@@ -17,7 +17,8 @@ interface DocumentRow {
 }
 interface DocumentLink extends DocumentRow { url: string; version: number; reviewStatus: string }
 const labels: Record<string, string> = {
-  payslip: "Pay Slip", validId: "Valid Identification", collateral: "Collateral Document", supporting: "Other Supporting Documents",
+  payslip: "Pay Slip", validId: "Valid Identification", collateral: "Collateral Document",
+  employerCertification: "Employer Certification", supporting: "Other Supporting Documents",
 };
 
 async function fetchDocuments(applicationId: string): Promise<DocumentLink[]> {

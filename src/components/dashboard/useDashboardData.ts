@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchDashboardActiveMembers, fetchDashboardLoans } from "./dashboard-data";
 
-import {fetchDashboardFinancials} from "./dashboard-financials";
+import { fetchDashboardCollections, fetchDashboardDisbursement } from "./dashboard-financials";
 import {usePortalLiveUpdates} from "@/lib/usePortalLiveUpdates";
 import type {ReportRange} from "./dashboard-model";
 
@@ -44,10 +44,12 @@ function useDashboardResource<T>(load: () => Promise<T>) {
 export function useDashboardData(range: ReportRange) {
   const loans = useDashboardResource(fetchDashboardLoans);
   const activeMembers = useDashboardResource(fetchDashboardActiveMembers);
-  const loadFinancials = useCallback(() => fetchDashboardFinancials(range.start,range.end),[range.start,range.end]);
-  const financials=useDashboardResource(loadFinancials);
-  const retryLoans=loans.retry,retryMembers=activeMembers.retry,retryFinancials=financials.retry;
-  const refresh=useCallback(()=>{retryLoans();retryMembers();retryFinancials();},[retryLoans,retryMembers,retryFinancials]);
+  const loadCollections = useCallback(() => fetchDashboardCollections(range.start, range.end), [range.start, range.end]);
+  const loadDisbursement = useCallback(() => fetchDashboardDisbursement(range.start, range.end), [range.start, range.end]);
+  const collections = useDashboardResource(loadCollections);
+  const disbursement = useDashboardResource(loadDisbursement);
+  const retryLoans=loans.retry,retryMembers=activeMembers.retry,retryCollections=collections.retry,retryDisbursement=disbursement.retry;
+  const refresh=useCallback(()=>{retryLoans();retryMembers();retryCollections();retryDisbursement();},[retryLoans,retryMembers,retryCollections,retryDisbursement]);
   const connected=usePortalLiveUpdates(refresh);
-  return { loans, activeMembers, financials, connected };
+  return { loans, activeMembers, collections, disbursement, connected };
 }

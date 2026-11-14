@@ -1,9 +1,10 @@
 import { normalizeMembershipType } from "./membership";
 
-export const documentKinds = ["validId", "payslip", "collateral", "supporting"] as const;
+export const documentKinds = ["validId", "payslip", "collateral", "employerCertification", "supporting"] as const;
 export type DocumentKind = typeof documentKinds[number];
 export const documentKindLabels: Record<DocumentKind, string> = {
-  validId: "Valid ID", payslip: "Pay Slip", collateral: "Collateral Document", supporting: "Supporting Document",
+  validId: "Valid ID", payslip: "Pay Slip", collateral: "Collateral Document",
+  employerCertification: "Employer Certification", supporting: "Supporting Document",
 };
 export type FileReviewStatus = "to_review" | "verified" | "needs_replacement";
 export type SubmissionReviewStatus = FileReviewStatus | "awaiting_files" | "requirements_unavailable";
@@ -68,7 +69,9 @@ export function filterDocumentApplications(applications: DocumentApplication[], 
 }
 export function memberDocumentRequirements(amount: unknown, collateralThreshold: unknown): DocumentKind[] | null {
   if (collateralThreshold == null || amount == null || !Number.isFinite(Number(amount)) || !Number.isFinite(Number(collateralThreshold))) return null;
-  return Number(amount) > Number(collateralThreshold) ? ["validId", "payslip", "collateral"] : ["validId", "payslip"];
+  const required: DocumentKind[] = ["validId", "payslip", "employerCertification"];
+  if (Number(amount) > Number(collateralThreshold)) required.push("collateral");
+  return required;
 }
 export function validateReview(status: unknown, reason: unknown) {
   if (status !== "verified" && status !== "needs_replacement") throw new Error("Choose Verified or Needs replacement.");

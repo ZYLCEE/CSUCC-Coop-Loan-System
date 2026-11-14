@@ -59,7 +59,7 @@ export function validateReviewMutation(value:unknown){
   clean={assignmentId:payload.assignmentId,reason,...(action==="reassign"?{membershipId:payload.membershipId}:{}),...(["approve","reject"].includes(action)?{confirmed:true}:{})};
  }else if(action==="reopen"){if(!reason)throw new Error("Enter the reason for returning this case to verification.");clean={reason};}
  else if(action==="finalize"){
-  if(!["approve","reject"].includes(String(payload.decision))||!reason)throw new Error("Choose the final decision and enter its reason.");clean={decision:payload.decision,reason};
+  if(!["approve","reject"].includes(String(payload.decision))||(payload.decision==="reject"&&!reason))throw new Error("Choose the final decision and enter a rejection reason.");clean={decision:payload.decision,reason:payload.decision==="approve"?(reason||"Approved"):reason};
  }else throw new Error("Choose a supported review action.");
  return {operation:action,applicationId:row.applicationId,requestId:row.requestId,revision:Number(row.revision),stateHash:row.stateHash,payload:clean};
 }

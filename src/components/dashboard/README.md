@@ -27,26 +27,26 @@ are unchanged. Removed widgets remain available as source components.
 
 ## Data sources and reporting rules
 
-- One paginated read of the existing `loan_applications` table supplies all loan
-  KPIs, trends and the five latest applications. Exact counts and duplicate checks
-  prevent silently truncated reports. Retry reloads this shared snapshot.
-- Pending Applications counts only `pending`, across the whole portfolio. Under
-  Review is a separate supported state and is not counted as Pending.
+- One paginated read of the existing `loan_applications` table supplies the
+  pending count, trends and five latest applications. Exact counts and duplicate
+  checks prevent silently truncated reports. Retry reloads this shared snapshot.
+- Pending Applications counts only initial `pending` applications across the
+  whole portfolio. Under Review and applications already enrolled in staff
+  verification are not counted. It refreshes with the shared loan snapshot.
 - Active Members reuses `fetchAdminAccounts` / `list-admin-accounts`, including its
   trusted role and account-status resolution. It counts distinct, linked active
   Member authentication IDs, excluding administrative and unlinked/deleted users.
   The count is unavailable if that service cannot be reached or is not deployed.
 - Monthly Net Disbursements sums recorded release principal less the recorded
   processing and service fees for records in `released`, `completed` or `overdue`
-  with `date_released` in the reporting period. This follows the existing
-  one-time release workflow; approval alone never counts. A released loan without
-  its release date or fee snapshots makes the total unavailable rather than
-  undercounting an unknown reporting period.
-- Monthly Collections uses the reporting function's sum of `loan_payments`
-  recorded as `posted` during the selected period. Reversals change the payment
-  status to `reversed`, so they are excluded. The Dashboard renders the confirmed
-  total returned by that function; if reporting data is unavailable, it shows a
-  dash and Retry instead of displaying zero.
+  with `date_released` in the selected reporting period. This follows the
+  existing one-time release workflow; approval alone never counts. A released
+  loan without its release date or fee snapshots makes the total unavailable
+  rather than undercounting an unknown reporting period.
+- Monthly Collections paginates authorized reads of `loan_payments`, summing
+  records with `payment_status = posted` and `payment_date` inside the selected
+  period. Reversed payments are excluded. Each metric loads independently, so
+  one reporting query failing does not hide the other cards.
 - Trends bucket `date_submitted` and `date_approved` separately. A loan submitted
   in September and approved in October belongs to different months in each series.
   Later released/completed loans retain their approval event. Missing approval
@@ -69,11 +69,9 @@ are unchanged. Removed widgets remain available as source components.
 
 ## Existing capability gaps
 
-**Hosted reporting setup:** the local reporting migration defines the
-`portal_dashboard_totals` function used for pending applications, posted
-collections, and net disbursements. The linked project must have the verified
-function definition before these totals can be considered live; missing
-functions or schema errors produce an unavailable state and Retry.
+**Live refresh:** dashboard resources refresh on authorized realtime events and
+on a 30-second foreground poll. If the realtime connection drops, the page shows
+a reconnecting notice while the periodic refresh continues.
 
 **Application details:** the Dashboard opens the shared read-only application
 details view. It contains no processing, approval, rejection, return, or release

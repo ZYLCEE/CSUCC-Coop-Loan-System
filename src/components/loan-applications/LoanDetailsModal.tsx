@@ -65,17 +65,17 @@ function LoanApplicationDetails({ applicationId, onClose }: Props) {
               <button type="button" className={actionButtonStyles()} onClick={() => { setRecord(null); setRejection(null); setRejectionError(""); setAttempt(value => value + 1); }}>Retry rejection information</button>
             </div>}
             {presentation.sections.map(section => (
-              <section key={section.title} aria-label={section.title} className="py-4 first:pt-0 last:pb-0">
-                <h3 className="mb-3 text-sm font-semibold text-coop-primary">{section.title}</h3>
-                {section.fields.length > 0 && <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+              <section key={section.title} aria-label={section.title} className="py-3 first:pt-0 last:pb-0">
+                <h3 className="mb-2 text-sm font-semibold text-coop-primary">{section.title}</h3>
+                {section.fields.length > 0 && <dl className="grid grid-cols-1 gap-x-5 gap-y-2 sm:grid-cols-2 lg:grid-cols-3">
                   {section.fields.map(field => <div key={field.label} className={`min-w-0 ${field.wide ? "sm:col-span-2 lg:col-span-3" : ""}`}>
                     <dt className="text-xs font-medium text-portal-secondary">{field.label}</dt>
-                    <dd className="mt-1 whitespace-pre-wrap text-sm leading-6 text-portal-primary [overflow-wrap:anywhere]">
+                    <dd className="mt-0.5 whitespace-pre-wrap text-sm leading-5 text-portal-primary [overflow-wrap:anywhere]">
                       {field.status ? <StatusBadge status={presentation.status} label={field.value} /> : field.value}
                     </dd>
                   </div>)}
                 </dl>}
-                {section.message && <p className={`${section.fields.length ? "mt-3 " : ""}text-sm leading-6 text-portal-secondary`}>{section.message}</p>}
+                {section.message && <p className={`${section.fields.length ? "mt-2 " : ""}text-sm leading-5 text-portal-secondary`}>{section.message}</p>}
               </section>
             ))}
             <ApplicationRequirementsSummary applicationId={applicationId} refreshVersion={attempt}/>

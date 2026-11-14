@@ -19,7 +19,7 @@ import ReviewerResponseDialog,{type ReviewerAction} from "./ReviewerResponseDial
 
 const tabs=[{id:"details",label:"Loan Details"},{id:"requirements",label:"Requirements"},{id:"approvals",label:"Committee Approvals"},{id:"decision",label:"My Decision"}] as const;
 export type ReviewTab=typeof tabs[number]["id"];
-const documentLabels:Record<string,string>={validId:"Valid ID",valid_id:"Valid ID",payslip:"Pay Slip",paySlip:"Pay Slip",collateral:"Collateral Document",collateralDocument:"Collateral Document"};
+const documentLabels:Record<string,string>={validId:"Valid ID",valid_id:"Valid ID",payslip:"Pay Slip",paySlip:"Pay Slip",collateral:"Collateral Document",collateralDocument:"Collateral Document",employerCertification:"Employer Certification"};
 export default function CommitteePacket({assignmentId,onClose,initialTab="details",onUpdated}:{assignmentId:string;onClose?:()=>void;initialTab?:ReviewTab;onUpdated?:()=>Promise<void>}){
  const {committeeRequest}=useCommitteeServices(),{role,portalPrefix,user,prototype}=useCommitteeAuth(),router=useRouter(),id=useId();
  const [packet,setPacket]=useState<Packet|null>(null),[error,setError]=useState(""),[loading,setLoading]=useState(true),[file,setFile]=useState<Packet["documents"][number]|null>(null);

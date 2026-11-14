@@ -22,6 +22,7 @@ import {committeeProgress,currentProcessingStep,isLoanReleased,processingStepDes
 import {getAdminPortalPrefix} from "@/lib/auth/roles";
 import {documentDate} from "@/components/documents/documentPresentation";
 import FinalApplicationSummary from "./FinalApplicationSummary";
+import ApplicationSummaryDetails from "./ApplicationSummaryDetails";
 import ProcessingReviewStep from "./ProcessingReviewStep";
 import ProcessingStepper from "./ProcessingStepper";
 import ProcessingRequirements,{requirementEvidence} from "./ProcessingRequirements";
@@ -130,16 +131,15 @@ export default function ProcessApplicationDialog({applicationId,onClose,onUpdate
   const activeLoansPath=getAdminPortalPrefix(role??"admin")+"/active-loans";
   return <>
     <FormDialog title="Process Application" icon={ClipboardCheck} subtitle={data?data.memberName+" · "+applicationId:applicationId}
-      className="max-w-[1080px]" overlayClassName="z-[140]" dirty={dirty} busy={interactionBusy} onClose={close}
+      className={`${styles.processDialog} max-w-[960px]`} overlayClassName="z-[140]" dirty={dirty} busy={interactionBusy} onClose={close}
       footer={<>
         <Button data-dialog-close disabled={interactionBusy}>Close</Button>
         {!loading&&requirementsOpen&&step===1&&data?.loanStatus.toLowerCase()!=="returned"&&!review?.finalDecision&&<Button variant="destructive" disabled={interactionBusy||!can(role==="super_admin"?"applications.finalize":"applications.verify")} onClick={()=>setRejectionOpen(true)}>{role==="super_admin"?"Reject Application":"Recommend Rejection"}</Button>}
         {!loading&&next&&<Button variant="primary" disabled={interactionBusy||next.disabled} loading={busy} onClick={()=>{if(next)runNext(next.kind);}}>{next.label}</Button>}
         {!loading&&data&&step===5&&isLoanReleased(data)&&<Link href={activeLoansPath} onClick={close} className="ui-button ui-button--primary">View in Active Loans</Link>}
       </>}>
-      {loading?<LoadingState label="Loading application progress…"/>:!data?<div className="space-y-3"><p role="alert" className="text-support text-status-danger">{error}</p><Button onClick={()=>void refresh()}>Retry</Button></div>:<div className="space-y-4">
+      {loading?<LoadingState label="Loading application progress…"/>:!data?<div className="space-y-3"><p role="alert" className="text-support text-status-danger">{error}</p><Button onClick={()=>void refresh()}>Retry</Button></div>:<div className="space-y-3">
         <ProcessingStepper application={data} review={review} currentStep={currentStep} selectedStep={step} disabled={interactionBusy||dirty} onSelect={number=>setSelectedStep(number===currentStep?null:number)}/>
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-surface-muted px-4 py-3 text-support"><span className="font-semibold">{data.loanType}{data.loanSummary?" · ₱"+Number(data.loanSummary.amount).toLocaleString("en-PH",{minimumFractionDigits:2})+" · "+data.loanSummary.months+" months":""}</span><span className="text-caption text-portal-secondary">{data.memberNumber}</span></div>
         {data.emailDelivery&&<p className="text-caption text-portal-secondary">Borrower email updates: {data.emailDelivery.queued} queued  -  {data.emailDelivery.sent} sent  -  {data.emailDelivery.failed} failed{data.emailDelivery.failed>0?". Delivery needs attention; do not repeat the loan decision.":""}</p>}
         {data.lastReturned&&<p className="rounded-lg bg-status-warning-surface p-3 text-support text-status-warning">Returned: {data.lastReturned.reason}</p>}
         {error&&<p role="alert" className="text-support text-status-danger">{error}</p>}
@@ -147,6 +147,7 @@ export default function ProcessApplicationDialog({applicationId,onClose,onUpdate
         {reviewError&&<p role="alert" className="text-support text-status-danger">{reviewError}</p>}
         {notice&&<p role="status" className="text-support text-status-success">{notice}</p>}
         {step===1?<>
+          <ApplicationSummaryDetails application={data} review={review}/>
           <ProcessingRequirements data={data} checks={checks} editable={editable} hideChecklist={!requirementsOpen} canReview={requirementsOpen&&can("documents.review")&&currentStep===1&&!needsRestart&&!review?.finalDecision} dirty={dirty} busy={busy||documentBusy}
             onCheck={(key,value)=>{edits.current++;setChecks(current=>({...current,[key]:value}));}} onBusy={setDocumentBusy}
             onUpdated={async()=>{committed.current=true;await load(true);setNotice("Document review saved.");}}/>
@@ -160,7 +161,7 @@ export default function ProcessApplicationDialog({applicationId,onClose,onUpdate
           {!isLoanReleased(data)&&currentStep===5&&<p className="text-support text-portal-secondary">Confirm the release date, voucher number and actual net proceeds received by the member.</p>}
           {!can("loans.release")&&!isLoanReleased(data)&&<p className="text-caption text-portal-secondary">Release permission is required to record disbursement.</p>}
         </section>:<>
-          {step===4?<FinalApplicationSummary application={data} review={review} onAction={setReviewAction} onBusy={setDocumentBusy}/>:<ProcessingReviewStep key={step} step={step} currentStep={currentStep} data={review} onAction={setReviewAction}/>}
+          {step===4?<FinalApplicationSummary application={data} review={review} onAction={setReviewAction} onBusy={setDocumentBusy}/>:<ProcessingReviewStep key={step} step={step} currentStep={currentStep} data={review} application={data} onAction={setReviewAction}/>}
         </>}
         {(data.canEnroll||data.enrolled)&&!review?.finalDecision&&(!data.policy||!review?.rules)&&<p className="rounded-lg border border-portal-border p-3 text-caption text-portal-secondary">Approval setup is incomplete. Super Admin must configure the approval policy and reviewer accounts before this application can be sent.</p>}
         {currentStep===1&&!canVerify&&data.canEnroll&&<p className="text-caption text-portal-secondary">Verification permission is required to save checks.</p>}

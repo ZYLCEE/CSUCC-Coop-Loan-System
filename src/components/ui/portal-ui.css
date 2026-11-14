@@ -62,6 +62,20 @@
     background: transparent;
   }
 
+  .ui-icon-button.ui-dialog-close {
+    border-color: var(--border-control);
+    background: var(--surface-muted);
+    color: var(--coop-dashboard-green);
+    transition: background-color 150ms, border-color 150ms, box-shadow 150ms, color 150ms;
+  }
+
+  .ui-icon-button.ui-dialog-close:hover:not(:disabled) {
+    border-color: var(--coop-dashboard-green);
+    background: var(--coop-dashboard-green);
+    color: var(--surface-card);
+    box-shadow: 0 0 0 3px rgb(21 93 59 / 14%);
+  }
+
   .ui-button--destructive {
     border-color: var(--status-danger);
     background: var(--status-danger-surface);

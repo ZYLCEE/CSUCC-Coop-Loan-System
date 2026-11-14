@@ -59,8 +59,8 @@ async function handle(request:Request){
           const correction=body.payload as Record<string,unknown>|null;
           if(!correction || !["documents","information","consent","other"].includes(String(correction.category)) ||
             typeof correction.reason!=="string" || !correction.reason.trim() || correction.reason.trim().length>2000 ||
-            !Array.isArray(correction.affectedKinds) || correction.affectedKinds.length>4 ||
-            correction.affectedKinds.some(kind=>!["validId","payslip","collateral","supporting"].includes(String(kind))))return reply({error:"Choose a correction category and enter member-visible instructions."},400);
+            !Array.isArray(correction.affectedKinds) || correction.affectedKinds.length>5 ||
+            correction.affectedKinds.some(kind=>!["validId","payslip","collateral","employerCertification","supporting"].includes(String(kind))))return reply({error:"Choose a correction category and enter member-visible instructions."},400);
           payload={category:correction.category,reason:correction.reason.trim(),affectedKinds:correction.affectedKinds};
         }
         result=await committeeServiceClient(request).rpc(operation==="reject_application"?"portal_reject_application":custom?"portal_application_action":"application_workflow_action",{p_actor_id:auth.data.user.id,...(custom&&operation!=="reject_application"?{p_operation:operation}:{}),p_args:{applicationId:body.applicationId,operation:body.operation,

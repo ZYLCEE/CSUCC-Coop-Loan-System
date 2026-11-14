@@ -10,7 +10,7 @@ export default function Sidebar(){
  const fullName=user?.user_metadata.full_name,name=(typeof fullName==="string"?fullName.trim():"")||user?.email||"Account";
  const href=(section:string)=>`${prefix}/${section}`;
  const groups:PortalNavigationGroup[]=[
-  {label:"OVERVIEW",items:[{icon:LayoutDashboard,label:"Dashboard",href:href("dashboard")}]},
+  {label:"MAIN",items:[{icon:LayoutDashboard,label:"Dashboard",href:href("dashboard")}]},
   {label:"LOAN MANAGEMENT",items:[{icon:FileText,label:"Loan Applications",href:href("loan-applications")},{icon:Users,label:"All Accounts",href:href(prefix?"all-accounts":"members")},{icon:CreditCard,label:"Active Loans",href:href("active-loans")}]},
   {label:"SYSTEM MANAGEMENT",items:[...(role==="super_admin"||can("committee.accounts.manage")?[{icon:Users,label:"Committee Accounts",href:href("committee-accounts")}]:[]),{icon:Folder,label:"Documents",href:href("documents")},{icon:BarChart3,label:"Reports",href:href("reports")},{icon:ClipboardList,label:"Active Logs",href:href("active-logs")}]},
   {label:"ACCOUNT",items:[{icon:Settings,label:"Settings",href:href("settings")},{icon:User,label:"My Profile",href:href("profile")}]},

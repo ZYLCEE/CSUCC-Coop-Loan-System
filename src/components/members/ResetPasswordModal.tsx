@@ -70,7 +70,7 @@ export default function ResetPasswordModal({
                 className="ui-icon-button ui-button--ghost absolute inset-y-0 right-0 h-full"
                 aria-label={showPassword ? "Hide temporary password" : "Show temporary password"}
               >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                {showPassword ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
               </button>
             </span>
           </label>
@@ -104,9 +104,9 @@ export default function ResetPasswordModal({
                 }
               >
                 {showConfirmPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
                   <Eye className="h-4 w-4" />
+                ) : (
+                  <EyeOff className="h-4 w-4" />
                 )}
               </button>
             </span>

@@ -6,6 +6,7 @@ const tones = {
   danger: "bg-status-danger-surface text-status-danger",
   info: "bg-status-info-surface text-status-info",
   neutral: "bg-status-neutral-surface text-status-neutral",
+  returned: "bg-[#e0e7ff] text-[#4338ca]",
   reviewer: "bg-[#f3e8ff] text-[#6b21a8]",
   board: "bg-[#ccfbf1] text-[#115e59]",
 };
@@ -20,7 +21,7 @@ export function Badge({ tone = "neutral", children, className = "" }: {
 
 const statusTones: Readonly<Partial<Record<string, keyof typeof tones>>> = {
   pending: "warning",
-  returned: "warning",
+  returned: "returned",
   "under review": "info",
   approved: "success",
   rejected: "danger",
