@@ -119,7 +119,8 @@ export async function createCommitteeAccount(session:SupabaseClient,body:Record<
    }user=created.data.user;
   }
   const finished=await session.rpc("committee_finish_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_user_id:user.id});checkCommitteeError(finished.error);
-  return {success:true,message:"Committee account created. Share the temporary credentials privately. The reviewer signs in on the main login page and sets their own password before reviewing loans."};
+  const accountNumber=typeof finished.data?.accountNumber==="string"?finished.data.accountNumber:"assigned in Committee Accounts";
+  return {success:true,message:`Committee account created. Permanent ID Number: ${accountNumber}. Share the temporary credentials privately. The reviewer signs in on the main login page and sets their own password before reviewing loans.`};
  }catch(error){
   await session.rpc("committee_request_failed",{p_request_id:body.requestId,p_attempt_id:attemptId,p_message:error instanceof CommitteeError?error.message:"Account creation failed. Retry the saved request."});throw error;
  }
@@ -151,7 +152,8 @@ export async function inviteCommitteeAccount(session:SupabaseClient,request:Requ
   if(updated.error)throw new CommitteeError("The invitation was requested, but account authorization could not be completed. Retry this saved invitation.",503);
   const finished=await session.rpc("committee_finish_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_user_id:user.id});
   checkCommitteeError(finished.error);
-  return {success:true,message:"Committee invitation recorded. The reviewer must complete their own password setup."};
+  const accountNumber=typeof finished.data?.accountNumber==="string"?finished.data.accountNumber:"assigned in Committee Accounts";
+  return {success:true,message:`Committee invitation recorded. Permanent ID Number: ${accountNumber}. The reviewer must complete their own password setup.`};
  }catch(error){
   await session.rpc("committee_request_failed",{p_request_id:body.requestId,p_attempt_id:attemptId,p_message:error instanceof CommitteeError?error.message:"Invitation processing failed. Retry the saved request."});
   throw error;

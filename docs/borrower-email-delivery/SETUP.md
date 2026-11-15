@@ -1,10 +1,12 @@
 # Borrower notification email delivery
 
-In-app application notices are normalized and queued by
-`20261113091000_portal_borrower_notifications.sql`. The
+In-app application notices are queued by the email-specific SQL change in
+`email-only-supabase-change.sql`. The
 `send-borrower-notification-emails` Edge Function drains that queue through
 Gmail SMTP. It sends only to the application's verified borrower email address;
-staff and committee notifications are not sent by this worker.
+staff and committee notifications are not sent by this worker. The email SQL
+does not replace or change the existing activity, approval, or verification
+functions.
 
 Use Gmail SMTP for application notification copies. Supabase Auth's built-in
 email service is a separate path for OTP, password-reset, and account emails;
@@ -26,10 +28,12 @@ values locally, and serve the function with that file. The member app's root
 credentials.
 
 For hosted Supabase Functions, set `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`,
-`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, `COOP_MEMBER_APP_URL`, and
-`COOP_EMAIL_WORKER_TOKEN` in **Edge Function Secrets**. Supabase supplies the
-project URL and service role key to the function. Use the worker token only for
-the scheduled invocation; never place it in client code.
+`SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM`, and `COOP_EMAIL_WORKER_TOKEN` in
+**Edge Function Secrets**. `COOP_MEMBER_APP_URL` is optional; when unset, the
+email directs the borrower to sign in to the app without adding a link. If set,
+it must be the borrower's publicly reachable HTTPS app URL. Supabase supplies
+the project URL and service role key to the function. Use the worker token only
+for the scheduled invocation; never place it in client code.
 
 Supabase Auth custom SMTP is configured separately in **Authentication → SMTP
 Settings**. The Edge Function secrets do not configure Auth, and Auth SMTP
@@ -37,15 +41,17 @@ settings do not automatically configure Edge Functions.
 
 ## Queue and retries
 
-The Edge Function requires the queue schema and RPCs from
-`20261113091000_portal_borrower_notifications.sql`. Production migration history
-and live workflow definitions need reconciliation before applying that
-migration; do not apply it piecemeal or run an ordinary `supabase db push`
-against the ambiguous migration history.
+The deployed function is version 3. The target production project did not have
+its queue RPCs, so the email-specific forward SQL and its recovery plan are
+provided in `email-only-supabase-change.sql`,
+`email-only-supabase-recovery.sql`, and `EMAIL_ONLY_CHANGE_REVIEW.md`. Review
+those exact changes before applying them. Do not run an ordinary `supabase db
+push` against the ambiguous legacy migration history.
 
-After schema reconciliation and function deployment, invoke the function on a
-schedule with Supabase Cron. Monitor queued, sent, and failed outbox states and
-the Edge Function logs. A stable Message-ID helps identify a retried message,
+After schema approval and secret configuration, schedule only this worker using
+`email-only-cron-setup.sql`. The schedule runs every five minutes and uses
+Supabase Vault for the function URL and worker token. Monitor queued, sent, and
+failed outbox states and the Edge Function logs. A stable Message-ID helps identify a retried message,
 but SMTP does not provide the same provider-side idempotency guarantee as an
 email API. A connection lost after Gmail accepts a message can leave delivery
 ambiguous; review provider history before manually retrying such a job.

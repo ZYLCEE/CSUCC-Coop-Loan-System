@@ -1,7 +1,6 @@
 import{readFileSync,writeFileSync}from'node:fs';
 const inputs={
  'src/components/committee/ReviewerResponseDialog.tsx':['Your account password'],
- 'src/components/committee/CommitteePrototype.tsx':['Prototype password'],
  'src/components/committee/CommitteeProfile.tsx':['Current password','New password','Confirm new password'],
  'src/components/loan-applications/ReturnApplicationDialog.tsx':['Your account password'],
  'src/components/loan-applications/LoanReleaseDialog.tsx':['Your account password'],

@@ -18,6 +18,12 @@ export async function POST(request:Request){
   const body=await readCommitteeBody(request);
   signal.throwIfAborted();
   const actionRequest=new Request(request.url,{headers:request.headers,signal});
+  if(body.operation==="allocate_account_number"){
+   if(!validCommitteeUuid(body.requestId))throw new CommitteeError("Reopen the account form and retry.");
+   const {session}=await verifiedCommitteeAdministrator(actionRequest);
+   const result=await session.rpc("committee_reserve_account_number",{p_request_id:body.requestId});checkCommitteeError(result.error);
+   return committeeReply(result.data);
+  }
   if(typeof body.password!=="string" || !body.password)throw new CommitteeError("Enter your account password.");
   const {session}=await verifiedCommitteeAdministrator(actionRequest,body.password);
   signal.throwIfAborted();

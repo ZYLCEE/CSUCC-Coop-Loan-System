@@ -27,7 +27,7 @@ interface MemberFormModalProps {
   mode: "add" | "edit";
   member: Member | null;
   onClose: () => void;
-  onSubmit: (member: Member, temporaryPassword?: string) => void;
+  onSubmit: (member: Member, temporaryPassword?: string, accountIdRequestId?: string, accountIdStorageKey?: string) => void;
   busy?: boolean;
 }
 
@@ -43,6 +43,8 @@ interface AccountFieldProps {
 }
 
 const accountControlClass = "block w-full";
+const memberAccountIdStoragePrefix = "coop-member-account-id-request-v1";
+const accountIdRequestPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const passwordControlClass = `${accountControlClass} pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden`;
 
 function AccountField({
@@ -127,52 +129,86 @@ export default function MemberFormModal({
   const [touchedFields, setTouchedFields] = useState<Partial<Record<keyof MemberFormErrors, boolean>>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [accountIdPreview, setAccountIdPreview] = useState("");
+  const [accountIdRequestId, setAccountIdRequestId] = useState("");
+  const [accountIdStorageKey, setAccountIdStorageKey] = useState("");
   const [accountIdPreviewError, setAccountIdPreviewError] = useState("");
   const [accountIdPreviewLoading, setAccountIdPreviewLoading] = useState(
     mode === "add",
   );
 
-  const loadAccountIdPreview = useCallback(async () => {
+  const prepareAccountIdRequest = useCallback(async () => {
+    if (mode !== "add") return;
+    setAccountIdPreviewLoading(true);
+    setAccountIdPreviewError("");
     try {
-      const { data, error } = await getSupabaseClient().functions.invoke(
-        "secure-admin-action",
-        { body: { mode: "preview-account-id" } },
-      );
-      if (error) {
-        throw error;
-      }
+      const client = getSupabaseClient();
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (sessionError || !userId) throw new Error("Sign in again to reserve the account ID.");
+
+      const storageKey = `${memberAccountIdStoragePrefix}:${userId}`;
+      const storedRequestId = window.sessionStorage.getItem(storageKey);
+      const requestId = storedRequestId && accountIdRequestPattern.test(storedRequestId)
+        ? storedRequestId
+        : crypto.randomUUID();
+      if (requestId !== storedRequestId) window.sessionStorage.setItem(storageKey, requestId);
+      setAccountIdStorageKey(storageKey);
+      setAccountIdRequestId(requestId);
+    } catch (error) {
+      setAccountIdPreviewError(error instanceof Error ? error.message : "Unable to prepare the account ID reservation.");
+      setAccountIdPreviewLoading(false);
+    }
+  }, [mode]);
+
+  const loadAccountIdPreview = useCallback(async () => {
+    if (!accountIdRequestId) return;
+    try {
+      const client = getSupabaseClient();
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      if (sessionError || !sessionData.session) throw new Error("Sign in again to reserve the account ID.");
+      const response = await fetch("/api/admin/member-account-id", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session.access_token}` },
+        body: JSON.stringify({ requestId: accountIdRequestId }),
+        cache: "no-store",
+      });
+      const data = await response.json().catch(() => null) as { accountNumber?: unknown; error?: unknown } | null;
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "Unable to reserve the account ID.");
       if (
         typeof data !== "object" ||
         data === null ||
-        !("previewId" in data) ||
-        typeof data.previewId !== "string" ||
-        !/^CSUCC-\d{4}-\d{4,}$/.test(data.previewId)
+        !("accountNumber" in data) ||
+        typeof data.accountNumber !== "string" ||
+        !/^CSUCC-\d{4}-\d{4,}$/.test(data.accountNumber)
       ) {
         throw new Error("The account service returned an invalid preview.");
       }
-      setAccountIdPreview(data.previewId);
+      setAccountIdPreview(data.accountNumber);
       setAccountIdPreviewError("");
-    } catch {
+    } catch (error) {
       setAccountIdPreviewError(
-        "Unable to load the Account ID preview.",
+        error instanceof Error ? error.message : "Unable to reserve the Account ID preview.",
       );
     } finally {
       setAccountIdPreviewLoading(false);
     }
-  }, []);
+  }, [accountIdRequestId]);
 
   const retryAccountIdPreview = () => {
     setAccountIdPreview("");
     setAccountIdPreviewError("");
     setAccountIdPreviewLoading(true);
-    void loadAccountIdPreview();
+    if (accountIdRequestId) void loadAccountIdPreview();
+    else void prepareAccountIdRequest();
   };
 
   useEffect(() => {
-    if (mode === "add") {
-      void Promise.resolve().then(loadAccountIdPreview);
-    }
-  }, [loadAccountIdPreview, mode]);
+    void prepareAccountIdRequest();
+  }, [prepareAccountIdRequest]);
+
+  useEffect(() => {
+    if (mode === "add" && accountIdRequestId) void loadAccountIdPreview();
+  }, [accountIdRequestId, loadAccountIdPreview, mode]);
 
   const availableRoles = mode === "add" ? creatableMemberRoles : memberRoles;
   const isMemberAccount = formData.role === "Member";
@@ -299,6 +335,10 @@ export default function MemberFormModal({
     const normalizedDepartment = formData.department.trim();
 
     if (busy) return;
+    if (mode === "add" && (!accountIdRequestId || !accountIdPreview || accountIdPreviewLoading || accountIdPreviewError)) {
+      setAccountIdPreviewError("Wait for the permanent ID Number to be reserved, then retry.");
+      return;
+    }
     if (!canSubmit) {
       document.getElementById(Object.keys(validationErrors)[0])?.focus();
       return;
@@ -307,7 +347,7 @@ export default function MemberFormModal({
     const submittedPassword = mode === "add" ? temporaryPassword : undefined;
     onSubmit({
       ...formData,
-      idNumber: mode === "add" ? "" : formData.idNumber,
+      idNumber: mode === "add" ? accountIdPreview : formData.idNumber,
       fullName: normalizedFullName,
       email: normalizedEmail,
       phone: formData.phone?.trim() ?? "",
@@ -316,7 +356,7 @@ export default function MemberFormModal({
       status: "Active",
       membershipType: isMemberAccount ? formData.membershipType ?? "regular" : null,
       createdAt: new Date().toISOString(),
-    }, submittedPassword);
+    }, submittedPassword, mode === "add" ? accountIdRequestId : undefined, mode === "add" ? accountIdStorageKey : undefined);
   };
 
   const dirty = JSON.stringify(formData) !== JSON.stringify(member ?? emptyMember) || !!temporaryPassword || !!confirmTemporaryPassword || identityVerified;

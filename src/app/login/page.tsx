@@ -18,7 +18,6 @@ import cooperativeLogo from "../../../assets/csucc-logo.png";
 import styles from "./login.module.css";
 import {getCommitteeRole} from "@/lib/committee";
 import {hasCommitteeEmailLink,acceptCommitteeEmailLink,resolvePortalAccess} from "@/lib/committeeAuth";
-import {committeeDemoAction,CommitteeDemoError} from "@/lib/committeeDemo";
 
 export default function AdminLoginPage() {
   const { openDashboard } = useLoginTransition();
@@ -54,8 +53,6 @@ export default function AdminLoginPage() {
     setLoading(true);
 
     try {
-      const demonstration=await committeeDemoAction({operation:"login",email:email.trim(),password});
-      if(demonstration.account){setPassword("");openDashboard(demonstration.account.role);return;}
       const supabase = getSupabaseClient();
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
@@ -89,7 +86,7 @@ export default function AdminLoginPage() {
       setPassword("");
       openDashboard(role);
     } catch (error) {
-      setErrorMessage(error instanceof CommitteeDemoError?error.message:getAuthErrorMessage(error));
+      setErrorMessage(getAuthErrorMessage(error));
     } finally {
       submitting.current = false;
       setLoading(false);

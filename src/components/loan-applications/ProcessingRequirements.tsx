@@ -55,6 +55,7 @@ export default function ProcessingRequirements({data,checks,editable,canReview,b
   const document=data.documents.find(item=>item.id===preview);
   const save=async(status:"verified"|"needs_replacement")=>{
     if(!document||pending.current||!canReview||!password)return;
+    if(status==="verified"&&document.reviewStatus==="needs_replacement"){setError("The member must upload the requested replacement before this document can be verified.");return;}
     if(status==="needs_replacement"&&!reason.trim()){setError("Enter a replacement reason for the member.");return;}
     pending.current=true;setSaving(true);onBusy(true);setError("");
     try{
@@ -94,14 +95,24 @@ export default function ProcessingRequirements({data,checks,editable,canReview,b
     </label>)}</fieldset>}
     {preview&&document&&<ActionDialog title={documentKindLabels[document.kind]} subtitle={document.name} overlayClassName="z-[160]" className="max-w-3xl" busy={saving} onClose={()=>setPreview(null)} footer={<>
       <Button disabled={saving} onClick={()=>setPreview(null)}>Close</Button>
-      {canReview&&<><Button disabled={saving} onClick={()=>setReplacing(true)}>Request Replacement</Button><Button variant="primary" disabled={saving||document.reviewStatus==="verified"} loading={saving} onClick={()=>{setReviewConfirm("verified");setPassword("");setError("");}}><CheckCircle2 className="h-4 w-4" />Verify Document</Button></>}
+      {canReview&&<><Button disabled={saving} onClick={()=>setReplacing(true)}>Request Replacement</Button><Button variant="primary" disabled={saving||document.reviewStatus==="verified"||document.reviewStatus==="needs_replacement"} loading={saving} onClick={()=>{setReviewConfirm("verified");setPassword("");setError("");}}><CheckCircle2 className="h-4 w-4" />Verify Document</Button></>}
     </>}>
       <DocumentFilePreview key={document.id+":"+document.version} kind="member" id={document.id} versionId={document.versionId} />
-      {replacing&&!reviewConfirm&&<label className="mt-3 block space-y-2 text-label">Reason shown to the member<Textarea value={reason} maxLength={2000} onChange={event=>setReason(event.target.value)} /><Button disabled={saving||!reason.trim()} onClick={()=>{setReviewConfirm("needs_replacement");setPassword("");}}>Continue</Button></label>}
-      {reviewConfirm==="needs_replacement"&&<div className="mt-4 space-y-3 rounded-lg border border-portal-border p-4"><p className="text-support">Request replacement of this document? Reason: {reason.trim()}</p><label className="block space-y-2 text-label">Your account password<PasswordInput label="Your account password" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="current-password" disabled={saving}/></label><Button variant="primary" disabled={saving||!password} onClick={()=>void save("needs_replacement")}>Confirm Replacement</Button><Button disabled={saving} onClick={()=>{setReviewConfirm(null);setPassword("");}}>Back</Button></div>}
+      {document.reviewStatus==="needs_replacement"&&<p role="status" className="mt-3 text-support text-status-warning">A replacement has been requested. Verify the member&apos;s newly uploaded version after it arrives.</p>}
       {error&&<p role="alert" className="mt-3 text-support text-status-danger">{error}</p>}
     </ActionDialog>}
-    {reviewConfirm==="verified"&&document&&<ConfirmActionDialog title="Verify Document" question="Confirm that this document has been checked and meets the requirements." confirmLabel="Confirm Verification" disabled={!password} busy={saving} error={error} overlayClassName="z-[170]" onClose={()=>{setReviewConfirm(null);setPassword("");setError("");}} onConfirm={()=>save("verified")}>
+    {replacing&&document&&<ActionDialog title="Request Document Replacement" subtitle={documentKindLabels[document.kind]} overlayClassName="z-[170]" busy={saving} onClose={()=>setReplacing(false)} footer={<><Button disabled={saving} onClick={()=>setReplacing(false)}>Cancel</Button><Button variant="primary" disabled={saving||!reason.trim()||!password} loading={saving} onClick={()=>void save("needs_replacement")}>Confirm Replacement</Button></>}>
+      <div className="space-y-5">
+        <label htmlFor="processing-replacement-reason" className="block text-label">Reason shown to the member <span className="text-status-danger">*</span>
+          <Textarea id="processing-replacement-reason" autoFocus rows={4} className="mt-2 block w-full" value={reason} maxLength={2000} onChange={event=>setReason(event.target.value)} placeholder="Explain what is missing, unreadable or incorrect." />
+        </label>
+        <label className="block space-y-2 text-label">Your account password
+          <PasswordInput label="Your account password" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="current-password" disabled={saving}/>
+        </label>
+        {error&&<p role="alert" className="text-support text-status-danger">{error}</p>}
+      </div>
+    </ActionDialog>}
+    {reviewConfirm==="verified"&&document&&<ConfirmActionDialog title="Verify Document" question="Confirm that this document has been checked and meets the requirements." confirmLabel="Confirm Verification" disabled={!password} busy={saving} error={error} overlayClassName="z-[180]" onClose={()=>{setReviewConfirm(null);setPassword("");setError("");}} onConfirm={()=>save("verified")}>
       <label className="block space-y-2 text-label">Your account password<PasswordInput label="Your account password" value={password} onChange={event=>setPassword(event.target.value)} autoComplete="current-password" disabled={saving}/></label>
     </ConfirmActionDialog>}
     {success&&<ActionResultDialog success message={success} overlayClassName="z-[170]" onClose={()=>setSuccess("")}/>}

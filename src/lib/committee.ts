@@ -19,6 +19,7 @@ export function getPortalDashboardPath(role:PortalRole){return getPortalPrefix(r
 export type PortalAccess={allowed:boolean;role:PortalRole|null;setupRequired:boolean;reviewEnabled?:boolean;reason:string|null;membershipId:string|null;name:string;email:string;committeeSeat?:CommitteeSeat;committeeMemberNumber?:1|2|null;startsAt?:string;endsAt?:string|null};
 export type CommitteeAccount={
   creationMode?:"invite"|"password";
+  accountNumber?:string|null;
   committeeMemberNumber?:1|2|null;
   id:string;requestId:string;userId:string|null;name:string;email:string;role:CommitteeRole;committeeSeat:CommitteeSeat;title:string;
   startsAt:string;endsAt:string|null;active:boolean;revision:number;setupCompletedAt:string|null;status:"invited"|"active"|"scheduled"|"expired"|"inactive"|"provisioning"|"failed"|"policy_disabled"|"blocked"|"recovery_pending";

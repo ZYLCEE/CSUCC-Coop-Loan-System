@@ -35,6 +35,30 @@ The deployed migrations do not replay old actions, fabricate historical approval
 
 The `notifications` table is added to the Realtime publication. Admin and committee clients subscribe only to INSERT/UPDATE events filtered by the current recipient; existing RLS still applies. The Admin bell/inbox also uses foreground/online refresh and a 30-second recovery poll. The member Flutter notification screen uses the same recipient filter, foreground refresh, debouncing and cleanup. See the [Supabase Postgres Changes documentation](https://supabase.com/docs/guides/realtime/postgres-changes) for publication and RLS behavior.
 
+### Email delivery
+
+For new recipient-addressed inbox rows, the notification email outbox sends the
+same title and recipient-safe message by email. It follows the existing event
+fan-out, so account status/details, loan processing, review, document, payment,
+announcement and system notices use the same recipient boundary as the in-app
+notification. It does not email old inbox rows, outgoing drafts, or events that
+did not create a recipient notification. Delivery is recorded separately and
+does not mark the in-app notification as read.
+
+Borrower-owned application notices remain on `application_email_outbox` and keep
+its verified, active borrower eligibility checks. The general notification
+outbox excludes those same borrower/application pairs to prevent duplicate
+messages. Other role-specific notifications use the general outbox. A confirmed
+Auth email is required; account-status blocking does not suppress an email that
+announces the account status change.
+
+Supabase Auth remains responsible for OTP, sign-up confirmation and password
+reset links through its configured SMTP provider. Those authentication messages
+are not copied into the in-app inbox: the reset request is unauthenticated, and
+creating an inbox alert from it could disclose whether an account exists. Any
+separate recipient-addressed inbox notice created by a trusted account action
+will also be emailed through the notification outbox.
+
 The main inbox supports search, read/category filters, newest/oldest order, page size, numbered pages, individual/bulk read actions, Philippine date/time, actor labels and links to related portal sections. It does not accept arbitrary destinations supplied through notification JSON.
 
 ## Files and deployment

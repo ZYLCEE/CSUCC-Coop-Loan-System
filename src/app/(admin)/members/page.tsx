@@ -290,7 +290,7 @@ export default function MembersPage() {
     });
   };
 
-  const saveMember = (member: Member, temporaryPassword?: string) => {
+  const saveMember = (member: Member, temporaryPassword?: string, accountIdRequestId?: string, accountIdStorageKey?: string) => {
     if (readOnly || saving.current) return;
     saving.current = true; setFormBusy(true);
     const unlock = () => { saving.current = false; setFormBusy(false); };
@@ -301,6 +301,8 @@ export default function MembersPage() {
       : "new-account";
     const payload = {
       fullName: member.fullName,
+      memberId: member.idNumber,
+      accountIdRequestId: accountIdRequestId ?? null,
       email: member.email,
       phone: member.phone,
       address: member.address,
@@ -350,6 +352,9 @@ export default function MembersPage() {
       onFailure: unlock,
       onSuccess: () => {
         unlock();
+        if (!isEdit && accountIdStorageKey && accountIdRequestId && window.sessionStorage.getItem(accountIdStorageKey) === accountIdRequestId) {
+          window.sessionStorage.removeItem(accountIdStorageKey);
+        }
         setMemberForm(null);
         setCurrentPage(1);
         refreshMembers();
