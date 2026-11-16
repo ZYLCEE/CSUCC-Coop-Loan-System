@@ -95,6 +95,8 @@ function providerFailure(error:{code?:string;status?:number}|null){
 export function setupRedirect(request:Request){return new URL("/auth/committee-setup",request.url).toString();}
 export async function createCommitteeAccount(session:SupabaseClient,body:Record<string,unknown>,request?:Request){
  if(!validCommitteeUuid(body.requestId))throw new CommitteeError("Reopen the account form and retry.");
+ const expectedAccountNumber=body.expectedAccountNumber;
+ if(typeof expectedAccountNumber!=="string"||!/^CSUCC-2026-\d{4,}$/.test(expectedAccountNumber))throw new CommitteeError("Refresh the form to load the next shared ID.",409);
  const details=validateCommitteeInvite(body.payload),credentials=validateCommitteeCredentials(body.credentials);
  if(body.identityVerified!==true)throw new CommitteeError("Confirm the reviewer's identity and assigned committee position.");
  const payload={...details,provisioningMode:"password"},attemptId=crypto.randomUUID();
@@ -118,7 +120,7 @@ export async function createCommitteeAccount(session:SupabaseClient,body:Record<
     throw new CommitteeError(created.error?.code==="weak_password"?"Choose a stronger temporary password that meets the password requirements.":"The committee account could not be created. Check the email and password requirements, then retry.",created.error?.status===429?429:400);
    }user=created.data.user;
   }
-  const finished=await session.rpc("committee_finish_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_user_id:user.id});checkCommitteeError(finished.error);
+  const finished=await session.rpc("committee_finish_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_user_id:user.id,p_expected_account_number:expectedAccountNumber});checkCommitteeError(finished.error);
   const accountNumber=typeof finished.data?.accountNumber==="string"?finished.data.accountNumber:"assigned in Committee Accounts";
   return {success:true,message:`Committee account created. Permanent ID Number: ${accountNumber}. Share the temporary credentials privately. The reviewer signs in on the main login page and sets their own password before reviewing loans.`};
  }catch(error){
@@ -127,6 +129,8 @@ export async function createCommitteeAccount(session:SupabaseClient,body:Record<
 }
 export async function inviteCommitteeAccount(session:SupabaseClient,request:Request,body:Record<string,unknown>){
  if(!validCommitteeUuid(body.requestId))throw new CommitteeError("Reopen the invitation form and retry.");
+ const expectedAccountNumber=body.expectedAccountNumber;
+ if(typeof expectedAccountNumber!=="string"||!/^CSUCC-2026-\d{4,}$/.test(expectedAccountNumber))throw new CommitteeError("Refresh the form to load the next shared ID.",409);
  const payload=validateCommitteeInvite(body.payload),attemptId=crypto.randomUUID();
  const reserved=await session.rpc("committee_reserve_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_payload:payload});
  checkCommitteeError(reserved.error);
@@ -150,7 +154,7 @@ export async function inviteCommitteeAccount(session:SupabaseClient,request:Requ
   delete metadata.admin_privileges;
   const updated=await service.auth.admin.updateUserById(user.id,{app_metadata:metadata});
   if(updated.error)throw new CommitteeError("The invitation was requested, but account authorization could not be completed. Retry this saved invitation.",503);
-  const finished=await session.rpc("committee_finish_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_user_id:user.id});
+  const finished=await session.rpc("committee_finish_invite",{p_request_id:body.requestId,p_attempt_id:attemptId,p_user_id:user.id,p_expected_account_number:expectedAccountNumber});
   checkCommitteeError(finished.error);
   const accountNumber=typeof finished.data?.accountNumber==="string"?finished.data.accountNumber:"assigned in Committee Accounts";
   return {success:true,message:`Committee invitation recorded. Permanent ID Number: ${accountNumber}. The reviewer must complete their own password setup.`};

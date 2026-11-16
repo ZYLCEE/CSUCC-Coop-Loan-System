@@ -83,7 +83,9 @@ export default function LoanReleaseDialog({ applicationId, onClose, onReleased, 
           <ActionSummary details={[
             { label: "Member", value: details?.member_name ?? "Not recorded" },
             { label: "Approved principal", value: currency(saved.amount) }, { label: "Processing fee", value: currency(saved.processing_fee_amount_at_release) },
-            { label: "Service fee", value: currency(saved.service_fee_amount_at_release) }, { label: "Net proceeds", value: currency(saved.net_proceeds) },
+            { label: "Retention fee", value: currency(saved.service_fee_amount_at_release) },
+            { label: `Loan insurance (LPPI ${saved.loan_lppi_factor_percent_at_release}%)`, value: currency(saved.loan_insurance_premium_at_release) },
+            { label: "Net proceeds", value: currency(saved.net_proceeds) },
             { label: "Monthly interest rate", value: `${saved.interest_rate_at_release}%` }, { label: "Release date", value: saved.date_released },
             { label: "Reference", value: saved.release_reference },
           ]} />
@@ -94,7 +96,8 @@ export default function LoanReleaseDialog({ applicationId, onClose, onReleased, 
             <p className="mb-4 text-sm text-portal-muted">Confirm the actual disbursement using the net proceeds below. Monthly interest: {details.base_interest_rate}% on the declining principal balance.</p>
             <dl className="mb-4 grid grid-cols-2 gap-3 rounded-portal-control bg-status-warning-surface p-4 text-body">
               <div><dt>Processing fee ({details.processing_fee_percent}%)</dt><dd className="font-semibold">{currency(releaseCharges.processingFee)}</dd></div>
-              <div><dt>Service fee ({details.service_fee_percent}%)</dt><dd className="font-semibold">{currency(releaseCharges.serviceFee)}</dd></div>
+              <div><dt>Retention fee ({details.service_fee_percent}%)</dt><dd className="font-semibold">{currency(releaseCharges.serviceFee)}</dd></div>
+              <div><dt>Loan insurance (LPPI {releaseCharges.loanInsuranceFactorPercent}%, one-time)</dt><dd className="font-semibold">{currency(releaseCharges.loanInsurancePremium)}</dd></div>
               <div><dt>Net proceeds to member</dt><dd className="font-semibold">{currency(releaseCharges.netProceeds)}</dd></div>
               <div><dt>Monthly interest rate</dt><dd className="font-semibold">{details.base_interest_rate}%</dd></div>
             </dl>
@@ -109,7 +112,9 @@ export default function LoanReleaseDialog({ applicationId, onClose, onReleased, 
               details={[
                 { label: "Application", value: details.application_id }, { label: "Member", value: details.member_name },
                 { label: "Approved principal", value: currency(details.amount) }, { label: "Processing fee", value: currency(releaseCharges.processingFee) },
-                { label: "Service fee", value: currency(releaseCharges.serviceFee) }, { label: "Net proceeds", value: currency(releaseCharges.netProceeds) },
+                { label: "Retention fee", value: currency(releaseCharges.serviceFee) },
+                { label: `Loan insurance (LPPI ${releaseCharges.loanInsuranceFactorPercent}%, one-time)`, value: currency(releaseCharges.loanInsurancePremium) },
+                { label: "Net proceeds", value: currency(releaseCharges.netProceeds) },
                 { label: "Monthly interest rate", value: `${details.base_interest_rate}%` }, { label: "Release date (Philippine time)", value: draft.date },
                 { label: "Reference", value: draft.reference },
               ]} busy={busy} error={error} onConfirm={save}

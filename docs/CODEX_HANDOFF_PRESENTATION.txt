@@ -21,13 +21,13 @@ PRESERVE THESE INTENDED WORKFLOW CHANGES
    the saved evidence.
 
 2. Co-maker consent
-   An accepted, OTP-verified co-maker approval tied to the specific loan
-   application is the co-maker's loan consent. It should count as the required
-   co-maker consent automatically; staff should not need to re-invite the
-   co-maker or manually create duplicate evidence.
-   Migration 20261112050000_count_accepted_comaker_otp_consent.sql adds this
-   behavior to the verification calculation. Confirm that it has been applied
-   to Supabase before diagnosing a remaining "0 of 1 recorded" count.
+   Co-maker consent is required for Regular and Associate Members when the
+   approved workflow policy requires it. An accepted, OTP-verified co-maker
+   approval tied to the specific loan application is the co-maker's loan
+   consent. It should count automatically; staff should not need to re-invite
+   the co-maker or manually create duplicate evidence.
+   Migration 20261117190000_restore_comaker_requirement_for_all_members.sql
+   restores the shared requirement and preserves accepted OTP consent evidence.
 
 3. Witness attestations
    Show the recorded witness names in the evidence view. The names supplied

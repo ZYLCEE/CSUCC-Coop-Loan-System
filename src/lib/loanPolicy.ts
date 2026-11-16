@@ -22,7 +22,7 @@ export const defaultLoanPolicy: LoanPolicy = {
   max_loan_multiplier: 3,
   min_member_tenure_months: 6,
   penalty_rate_percent: 2,
-  service_fee_percent: 0.5,
+  service_fee_percent: 5,
   co_maker_required_above: 50000,
   collateral_required_above: 200000,
   loan_processing_time: "3–5",

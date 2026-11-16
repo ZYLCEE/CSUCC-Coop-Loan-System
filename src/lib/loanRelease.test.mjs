@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import ts from 'typescript';
 const code = ts.transpileModule(readFileSync(new URL('./loanRelease.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const details = { application_id: 'APP-001', member_name: 'Member', amount: '1000.50', status: 'approved', date_submitted: '2026-01-01', date_approved: '2026-01-02', date_released: null };
+const details = { application_id: 'APP-001', member_name: 'Member', amount: '1000.50', status: 'approved', date_submitted: '2026-01-01', date_approved: '2026-01-02', date_released: null, tenure_months: 24 };
 const policy = { base_interest_rate: 2, processing_fee_percent: 1, service_fee_percent: 0.5 };
 const draft = { date: '2026-01-03', reference: ' DV-001 ', notes: 'Voucher checked' };
 function setup(error = null) {
@@ -17,7 +17,7 @@ test('release preview loads policy rates and looks up the application number', a
   const f = setup();
   assert.deepEqual(await f.loadLoanRelease('APP-001'), { ...details, ...policy });
   assert.deepEqual(f.calls.slice(0, 6), [
-    'loan_applications', 'application_id,member_name,amount,status,date_submitted,date_approved,date_released', ['application_id', 'APP-001'],
+    'loan_applications', 'application_id,member_name,amount,status,date_submitted,date_approved,date_released,tenure_months', ['application_id', 'APP-001'],
     'loan_policy_settings', 'base_interest_rate,processing_fee_percent,service_fee_percent', ['singleton', true],
   ]);
 });
@@ -25,9 +25,10 @@ test('release submits the recorded approval amount, reference and retry identifi
   const f = setup(); await f.releaseApprovedLoan(details, draft, 'request-id', 'Synthetic-Password1!');
   assert.deepEqual(f.calls, [{endpoint:'/api/admin/loan-release',body:{applicationId:'APP-001',requestId:'request-id',date:'2026-01-03',reference:'DV-001',amount:'1000.50',notes:'Voucher checked',password:'Synthetic-Password1!'}}]);
 });
-test('release fee preview rounds one-time fees to cents and subtracts them from proceeds', () => {
+test('release fee preview rounds one-time fees and LPPI to cents before subtracting from proceeds', () => {
   assert.deepEqual(setup().releaseChargePreview({ ...details, ...policy }), {
-    processingFee: 10.01, serviceFee: 5, netProceeds: 985.49,
+    processingFee: 10.01, serviceFee: 5, loanInsuranceFactorPercent: 1.95,
+    loanInsurancePremium: 19.51, netProceeds: 965.98,
   });
 });
 test('invalid dates, blank references, missing approval and already released loans do not reach the database', async () => {

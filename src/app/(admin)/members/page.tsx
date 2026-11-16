@@ -252,7 +252,7 @@ export default function MembersPage() {
       securityTitle: deleting ? "Verify Account Deletion" : "Verify Account Block",
       securityDescription: `Enter your Super Admin password to continue ${deleting ? "deleting" : "blocking"} this account.`,
       securityDetails: [{ label: "Account", value: member.fullName }, { label: "ID Number", value: member.idNumber }],
-      question: deleting ? `Permanently delete ${member.fullName}'s sign-in account?` : `Block ${member.fullName}'s account? They will no longer be able to access the system.`,
+      question: deleting ? `Permanently delete ${member.fullName}'s profile, loans, payment history, savings records, and linked loan documents?` : `Block ${member.fullName}'s account? They will no longer be able to access the system.`,
       confirmLabel: deleting ? "Delete Account" : "Block Account",
       successMessage: deleting ? "Account deleted successfully." : "Account blocked successfully.",
       payload: { reason },
@@ -290,7 +290,7 @@ export default function MembersPage() {
     });
   };
 
-  const saveMember = (member: Member, temporaryPassword?: string, accountIdRequestId?: string, accountIdStorageKey?: string) => {
+  const saveMember = (member: Member, temporaryPassword?: string) => {
     if (readOnly || saving.current) return;
     saving.current = true; setFormBusy(true);
     const unlock = () => { saving.current = false; setFormBusy(false); };
@@ -301,8 +301,7 @@ export default function MembersPage() {
       : "new-account";
     const payload = {
       fullName: member.fullName,
-      memberId: member.idNumber,
-      accountIdRequestId: accountIdRequestId ?? null,
+      expectedAccountNumber: member.idNumber,
       email: member.email,
       phone: member.phone,
       address: member.address,
@@ -352,9 +351,6 @@ export default function MembersPage() {
       onFailure: unlock,
       onSuccess: () => {
         unlock();
-        if (!isEdit && accountIdStorageKey && accountIdRequestId && window.sessionStorage.getItem(accountIdStorageKey) === accountIdRequestId) {
-          window.sessionStorage.removeItem(accountIdStorageKey);
-        }
         setMemberForm(null);
         setCurrentPage(1);
         refreshMembers();

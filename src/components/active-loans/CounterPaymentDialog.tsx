@@ -93,13 +93,13 @@ export default function CounterPaymentDialog({ loanId, onClose, onSaved }: { loa
       <button disabled={busy || loading} onClick={() => void refresh()} className="ui-button ui-button--compact">Refresh balances</button>
       {ledger && <>
         <dl className="my-3 grid grid-cols-2 gap-3 rounded-lg bg-surface-muted p-3 text-sm sm:grid-cols-3"><div><dt>Original principal</dt><dd className="mt-1 font-semibold">{pesos(Number(ledger.principal))}</dd></div><div><dt>Principal remaining</dt><dd className="mt-1 font-semibold">{ledger.principal_remaining == null ? 'Needs reconciliation' : pesos(Number(ledger.principal_remaining))}</dd></div><div><dt>Total remaining balance</dt><dd className="mt-1 font-semibold">{ledger.total_remaining === undefined ? 'Update required' : ledger.total_remaining === null ? 'Needs reconciliation' : pesos(Number(ledger.total_remaining))}</dd></div></dl>
-        <p className="mb-3 text-xs text-portal-secondary">Total remaining includes unpaid principal, interest, and penalties. Processing and service fees are deducted at release and are not charged again here.</p>
+        <p className="mb-3 text-xs text-portal-secondary">Total remaining includes unpaid principal, interest, and penalties. Processing and retention fees are deducted at release and are not charged again here.</p>
         {ledger.automatic_allocation !== undefined && <details className="mb-3 text-xs leading-5 text-portal-muted">
           <summary className="cursor-pointer font-medium">How payments are applied</summary>
           <p className="mt-2">The payment covers penalties first, then scheduled interest, then principal.</p>
           <p className="mt-1">
           {'Interest follows the saved repayment schedule when available; otherwise it uses the release-time rate snapshot.'}
-          {' '}Processing and service fees are charged once at release, not in this receipt. Unknown historical penalty periods are not back-charged.
+          {' '}Processing and retention fees are charged once at release, not in this receipt. Unknown historical penalty periods are not back-charged.
           </p>
         </details>}
         {canWrite && !eligible && !fullyPaid && <p className="mb-4 text-sm text-status-warning">{ledger.unallocated_payments ? 'Older payments have no recorded allocation. Reconcile those records before adding payments.' : 'Payments are enabled after the loan is released and its release date is recorded.'}</p>}

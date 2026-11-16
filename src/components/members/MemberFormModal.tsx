@@ -27,7 +27,7 @@ interface MemberFormModalProps {
   mode: "add" | "edit";
   member: Member | null;
   onClose: () => void;
-  onSubmit: (member: Member, temporaryPassword?: string, accountIdRequestId?: string, accountIdStorageKey?: string) => void;
+  onSubmit: (member: Member, temporaryPassword?: string) => void;
   busy?: boolean;
 }
 
@@ -43,8 +43,6 @@ interface AccountFieldProps {
 }
 
 const accountControlClass = "block w-full";
-const memberAccountIdStoragePrefix = "coop-member-account-id-request-v1";
-const accountIdRequestPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const passwordControlClass = `${accountControlClass} pr-10 [&::-ms-reveal]:hidden [&::-ms-clear]:hidden`;
 
 function AccountField({
@@ -129,87 +127,45 @@ export default function MemberFormModal({
   const [touchedFields, setTouchedFields] = useState<Partial<Record<keyof MemberFormErrors, boolean>>>({});
   const [submitAttempted, setSubmitAttempted] = useState(false);
   const [accountIdPreview, setAccountIdPreview] = useState("");
-  const [accountIdRequestId, setAccountIdRequestId] = useState("");
-  const [accountIdStorageKey, setAccountIdStorageKey] = useState("");
   const [accountIdPreviewError, setAccountIdPreviewError] = useState("");
-  const [accountIdPreviewLoading, setAccountIdPreviewLoading] = useState(
-    mode === "add",
-  );
-
-  const prepareAccountIdRequest = useCallback(async () => {
-    if (mode !== "add") return;
-    setAccountIdPreviewLoading(true);
-    setAccountIdPreviewError("");
-    try {
-      const client = getSupabaseClient();
-      const { data: sessionData, error: sessionError } = await client.auth.getSession();
-      const userId = sessionData.session?.user.id;
-      if (sessionError || !userId) throw new Error("Sign in again to reserve the account ID.");
-
-      const storageKey = `${memberAccountIdStoragePrefix}:${userId}`;
-      const storedRequestId = window.sessionStorage.getItem(storageKey);
-      const requestId = storedRequestId && accountIdRequestPattern.test(storedRequestId)
-        ? storedRequestId
-        : crypto.randomUUID();
-      if (requestId !== storedRequestId) window.sessionStorage.setItem(storageKey, requestId);
-      setAccountIdStorageKey(storageKey);
-      setAccountIdRequestId(requestId);
-    } catch (error) {
-      setAccountIdPreviewError(error instanceof Error ? error.message : "Unable to prepare the account ID reservation.");
-      setAccountIdPreviewLoading(false);
-    }
-  }, [mode]);
+  const [accountIdPreviewLoading, setAccountIdPreviewLoading] = useState(mode === "add");
 
   const loadAccountIdPreview = useCallback(async () => {
-    if (!accountIdRequestId) return;
+    if (mode !== "add") return;
     try {
       const client = getSupabaseClient();
       const { data: sessionData, error: sessionError } = await client.auth.getSession();
-      if (sessionError || !sessionData.session) throw new Error("Sign in again to reserve the account ID.");
+      if (sessionError || !sessionData.session) throw new Error("Sign in again to view the next account ID.");
       const response = await fetch("/api/admin/member-account-id", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${sessionData.session.access_token}` },
-        body: JSON.stringify({ requestId: accountIdRequestId }),
+        headers: { Authorization: `Bearer ${sessionData.session.access_token}` },
         cache: "no-store",
       });
       const data = await response.json().catch(() => null) as { accountNumber?: unknown; error?: unknown } | null;
-      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "Unable to reserve the account ID.");
-      if (
-        typeof data !== "object" ||
-        data === null ||
-        !("accountNumber" in data) ||
-        typeof data.accountNumber !== "string" ||
-        !/^CSUCC-\d{4}-\d{4,}$/.test(data.accountNumber)
-      ) {
+      if (!response.ok) throw new Error(typeof data?.error === "string" ? data.error : "Unable to load the next account ID.");
+      if (typeof data?.accountNumber !== "string" || !/^CSUCC-2026-\d{4,}$/.test(data.accountNumber)) {
         throw new Error("The account service returned an invalid preview.");
       }
       setAccountIdPreview(data.accountNumber);
       setAccountIdPreviewError("");
     } catch (error) {
-      setAccountIdPreviewError(
-        error instanceof Error ? error.message : "Unable to reserve the Account ID preview.",
-      );
+      setAccountIdPreviewError(error instanceof Error ? error.message : "Unable to load the next account ID.");
     } finally {
       setAccountIdPreviewLoading(false);
     }
-  }, [accountIdRequestId]);
+  }, [mode]);
+
+  useEffect(() => {
+    if (mode !== "add") return;
+    void loadAccountIdPreview();
+    const refresh = window.setInterval(() => void loadAccountIdPreview(), 5000);
+    return () => window.clearInterval(refresh);
+  }, [loadAccountIdPreview, mode]);
 
   const retryAccountIdPreview = () => {
-    setAccountIdPreview("");
-    setAccountIdPreviewError("");
     setAccountIdPreviewLoading(true);
-    if (accountIdRequestId) void loadAccountIdPreview();
-    else void prepareAccountIdRequest();
+    void loadAccountIdPreview();
   };
-
-  useEffect(() => {
-    void prepareAccountIdRequest();
-  }, [prepareAccountIdRequest]);
-
-  useEffect(() => {
-    if (mode === "add" && accountIdRequestId) void loadAccountIdPreview();
-  }, [accountIdRequestId, loadAccountIdPreview, mode]);
-
   const availableRoles = mode === "add" ? creatableMemberRoles : memberRoles;
   const isMemberAccount = formData.role === "Member";
   const isRegularMembership =
@@ -335,8 +291,8 @@ export default function MemberFormModal({
     const normalizedDepartment = formData.department.trim();
 
     if (busy) return;
-    if (mode === "add" && (!accountIdRequestId || !accountIdPreview || accountIdPreviewLoading || accountIdPreviewError)) {
-      setAccountIdPreviewError("Wait for the permanent ID Number to be reserved, then retry.");
+    if (mode === "add" && (!accountIdPreview || accountIdPreviewLoading || accountIdPreviewError)) {
+      setAccountIdPreviewError("Wait for the next shared ID to load, then retry.");
       return;
     }
     if (!canSubmit) {
@@ -356,7 +312,7 @@ export default function MemberFormModal({
       status: "Active",
       membershipType: isMemberAccount ? formData.membershipType ?? "regular" : null,
       createdAt: new Date().toISOString(),
-    }, submittedPassword, mode === "add" ? accountIdRequestId : undefined, mode === "add" ? accountIdStorageKey : undefined);
+    }, submittedPassword);
   };
 
   const dirty = JSON.stringify(formData) !== JSON.stringify(member ?? emptyMember) || !!temporaryPassword || !!confirmTemporaryPassword || identityVerified;
@@ -385,33 +341,17 @@ export default function MemberFormModal({
               label={mode === "add" ? "ID Number (Auto-generated)" : "ID Number"}
               required={false}
               error={mode === "add" ? accountIdPreviewError : undefined}
-              errorAction={
-                mode === "add" && accountIdPreviewError ? (
-                  <button
-                    type="button"
-                    onClick={retryAccountIdPreview}
-                    disabled={accountIdPreviewLoading}
-                    className={actionButtonStyles("secondary", "xs")}
-                  >
-                    Retry
-                  </button>
-                ) : undefined
-              }
+              errorAction={mode === "add" && accountIdPreviewError ? (
+                <button type="button" onClick={retryAccountIdPreview} disabled={accountIdPreviewLoading}
+                  className={actionButtonStyles("secondary", "xs")}>Retry</button>
+              ) : undefined}
             >
               <Input
                 id="idNumber"
                 name="idNumber"
                 type="text"
                 value={mode === "add" ? accountIdPreview : formData.idNumber}
-                placeholder={
-                  mode === "add"
-                    ? accountIdPreviewLoading
-                      ? "Loading preview..."
-                      : accountIdPreviewError
-                        ? "Preview unavailable"
-                        : ""
-                    : ""
-                }
+                placeholder={mode === "add" ? (accountIdPreviewLoading ? "Loading next ID…" : "Unavailable") : ""}
                 readOnly
                 aria-readonly="true"
                 title="Account IDs are generated automatically and cannot be edited."

@@ -85,21 +85,27 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
  const [memberNumber,setMemberNumber]=useState<1|2|null>(account?.committeeMemberNumber??null);
  const [start,setStart]=useState(membershipDateInput(account?.startsAt??new Date().toISOString())),[end,setEnd]=useState(membershipDateInput(account?.endsAt??null,true)),[reason,setReason]=useState(""),[password,setPassword]=useState("");
  const [review,setReview]=useState(false),[attempted,setAttempted]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[requestId]=useState(()=>retry?account!.requestId:crypto.randomUUID()),[payload,setPayload]=useState<CommitteeInvite|null>(null);
- const [accountNumber,setAccountNumber]=useState<string|null>(account?.accountNumber??null),[allocatingId,setAllocatingId]=useState(false),[allocationError,setAllocationError]=useState("");
+ const [accountNumber,setAccountNumber]=useState<string|null>(account?.accountNumber??null),[allocationError,setAllocationError]=useState("");
  const label=creating?(retry?"Retry creation":"Create Committee Account"):mode==="edit"?"Edit Committee Account":mode==="link"?"Send setup / reset link":mode==="deactivate"?"Block Account":"Unblock Account";
  const [temporary,setTemporary]=useState(""),[temporaryConfirm,setTemporaryConfirm]=useState(""),[identityVerified,setIdentityVerified]=useState(false);
  const pending=useRef(false),[checked,setChecked]=useState(false),[touched,setTouched]=useState<Record<string,boolean>>({});
  useEffect(()=>{
-  if(!creating)return;
-  if(account?.accountNumber){setAccountNumber(account.accountNumber);return;}
-  let active=true;setAccountNumber(null);setAllocatingId(true);setAllocationError("");
-  void committeeRequest<{accountNumber:string}>("",{method:"POST",body:JSON.stringify({operation:"allocate_account_number",requestId})},true)
-   .then(result=>{if(!/^CSUCC-2026-\d{4,}$/.test(result.accountNumber))throw new Error("The ID service returned an invalid number.");if(active)setAccountNumber(result.accountNumber);})
-   .catch(error=>{if(active)setAllocationError(error instanceof Error?error.message:"The next committee ID could not be reserved.");})
-   .finally(()=>{if(active)setAllocatingId(false);});
-  return()=>{active=false;};
- },[creating,account?.accountNumber,requestId]);
- const idNumber=accountNumber??(allocationError?"Unavailable":"Reserving next ID…");
+  if(!creating||account?.accountNumber)return;
+  let active=true,loading=false;
+  const refresh=async()=>{
+   if(loading)return;loading=true;
+   try{
+    const result=await committeeRequest<{accountNumber:string}>("",{method:"POST",body:JSON.stringify({operation:"preview_account_number"})},true);
+    if(!/^CSUCC-2026-\d{4,}$/.test(result.accountNumber))throw new Error("The ID service returned an invalid preview.");
+    if(active){setAccountNumber(result.accountNumber);setAllocationError("");}
+   }catch(error){if(active)setAllocationError(error instanceof Error?error.message:"The next committee ID could not be loaded.");}
+   finally{loading=false;}
+  };
+  void refresh();
+  const interval=window.setInterval(()=>void refresh(),5000);
+  return()=>{active=false;window.clearInterval(interval);};
+ },[creating,account?.accountNumber]);
+ const idNumber=accountNumber??"Loading next ID…";
  const fieldErrors:Record<string,string>={};
  if(!name.trim()||name.trim().length>160||/[\u0000-\u001f\u007f]/.test(name))fieldErrors.name="Enter a full name of up to 160 characters.";
  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())||email.length>254)fieldErrors.email="Enter a valid email address.";
@@ -118,7 +124,7 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
  const prepare=()=>{
   setError("");setChecked(true);
   try{
-   if(creating&&!accountNumber)throw new Error(allocationError||"Wait for the permanent ID Number to be assigned before continuing.");
+   if(creating&&(!accountNumber||allocationError))throw new Error(allocationError||"Wait for the shared ID preview to load, then retry.");
    if(creating||mode==="edit"){
     if(Object.keys(fieldErrors).length)throw new Error("Complete the highlighted fields before continuing.");
     const input=validateCommitteeInvite({name,email,role,committeeSeat,committeeMemberNumber:memberNumber,title,...membershipDates(start,end)});
@@ -134,13 +140,13 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
   if(pending.current)return;setError("");if(!password){setError("Enter your account password.");return;}
   pending.current=true;setBusy(true);setAttempted(true);
   try{
-   const result=await committeeRequest<{message?:string}>("",{method:"POST",body:JSON.stringify({operation:mode,id:account?.id,revision:account?.revision,requestId,password,...(mode==="create"?{credentials:{password:temporary,confirm:temporaryConfirm},identityVerified}:{}),payload:creating?payload:mode==="edit"?{...payload,reason:reason.trim()}:{reason:reason.trim()}})},true);
+   const result=await committeeRequest<{message?:string}>("",{method:"POST",body:JSON.stringify({operation:mode,id:account?.id,revision:account?.revision,requestId,password,...(creating?{expectedAccountNumber:accountNumber}:{}),...(mode==="create"?{credentials:{password:temporary,confirm:temporaryConfirm},identityVerified}:{}),payload:creating?payload:mode==="edit"?{...payload,reason:reason.trim()}:{reason:reason.trim()}})},true);
    onSaved(result.message??(mode==="invite"?"Invitation processed. The reviewer must open their email link and choose a password.":mode==="link"?"A setup/reset link was requested for this reviewer.":"Committee membership updated."));
   }catch(error){setError(error instanceof Error?error.message:"The committee action failed. Retry this request.");}
   finally{pending.current=false;setPassword("");setBusy(false);}
  };
  if(review&&!creating&&account)return <CommitteeAccountConfirmation title={mode==="edit"?"Save Changes":label} account={account} operation={mode} payload={mode==="edit"?{...payload,reason:reason.trim()}:{reason:reason.trim()}} requestId={requestId} onBack={()=>setReview(false)} onClose={onClose} onSaved={onSaved} onAttempt={()=>setAttempted(true)}/>;
- return <ActionDialog title={label} subtitle={account?.email} onClose={onClose} busy={busy} className="max-w-xl" footer={<><Button disabled={busy} onClick={onClose}>Cancel</Button>{review?<Button variant="primary" loading={busy} onClick={()=>void save()}>{mode==="create"?"Create account":mode==="invite"?"Send invitation":"Confirm"}</Button>:<Button variant="primary" disabled={creating&&(!accountNumber||allocatingId)} onClick={prepare}>Review</Button>}</>}>
+ return <ActionDialog title={label} subtitle={account?.email} onClose={onClose} busy={busy} className="max-w-xl" footer={<><Button disabled={busy} onClick={onClose}>Cancel</Button>{review?<Button variant="primary" loading={busy} onClick={()=>void save()}>{mode==="create"?"Create account":mode==="invite"?"Send invitation":"Confirm"}</Button>:<Button variant="primary" disabled={creating&&(!accountNumber||!!allocationError)} onClick={prepare}>Review</Button>}</>}>
   {review?<div className="space-y-4 text-support">
    <dl className="grid grid-cols-2 gap-3"><div><dt className="text-caption text-portal-secondary">ID Number</dt><dd className="break-all font-mono tabular-nums">{idNumber}</dd></div><div><dt className="text-caption text-portal-secondary">Reviewer</dt><dd className="break-words font-semibold">{name||account?.name}</dd></div><div><dt className="text-caption text-portal-secondary">Approval position</dt><dd>{committeePositionLabel(role,committeeSeat,memberNumber)}</dd></div>
     <div className="col-span-2"><dt className="text-caption text-portal-secondary">Email</dt><dd className="break-all">{email}</dd></div>
@@ -156,8 +162,7 @@ function CommitteeMembershipDialog({mode,account,accounts,onClose,onSaved}:{mode
    {(creating||mode==="edit")?<>
     <CommitteeField label="Full name" id="committee-account-name" error={shownError("name")}><Input {...inputProps("name")} value={name} onChange={event=>setName(event.target.value)} maxLength={160} disabled={retry||attempted} autoComplete="name" /></CommitteeField>
     <CommitteeField label="Email address" id="committee-account-email" error={shownError("email")}><Input {...inputProps("email")} type="email" value={email} onChange={event=>setEmail(event.target.value)} disabled={mode==="edit"||retry||attempted} maxLength={254} autoComplete="off" /></CommitteeField>
-   {creating&&<CommitteeField label="ID Number"><Input value={idNumber} readOnly aria-label="Auto-generated permanent committee ID number" className="font-mono tabular-nums" /><span className="text-caption text-portal-secondary">{accountNumber?"Permanent number reserved for this account.":allocationError?"The number could not be reserved. Close and reopen the form to retry.":"Reserving the next permanent number…"}</span></CommitteeField>}
-   {creating&&allocationError&&<p role="alert" className="text-caption text-status-danger sm:col-span-2">{allocationError}</p>}
+   {creating&&<CommitteeField label="ID Number"><Input value={accountNumber??""} placeholder="Loading next ID…" readOnly aria-label="Next shared committee ID preview, assigned on creation" className="font-mono tabular-nums" /><span className="text-caption text-portal-secondary">Next shared ID preview. It is assigned only when the account is created.</span>{allocationError&&<span role="alert" className="text-caption text-status-danger">{allocationError}</span>}</CommitteeField>}
     <CommitteeField label="Approval position" id="committee-account-position" error={shownError("position")}><Select {...inputProps("position")} value={role==="crecom_member"&&committeeSeat==="member"?memberNumber?"crecom_member:member:"+memberNumber:"":role+":"+committeeSeat} onChange={event=>{const [nextRole,nextSeat,nextNumber]=event.target.value.split(":");setRole(nextRole as CommitteeRole);setCommitteeSeat(nextSeat as CommitteeSeat);setMemberNumber(nextNumber?Number(nextNumber) as 1|2:null);}} disabled={attempted||(retry&&!!account?.committeeMemberNumber)}><option value="" disabled>Choose approval position</option><option value="crecom_member:member:1">CRECOM Member 1</option><option value="crecom_member:member:2">CRECOM Member 2</option><option value="crecom_member:chairperson">CRECOM Chairperson</option><option value="bod_member:chairperson">BOD Chairperson</option></Select></CommitteeField>
     {mode==="edit"&&<>
      <CommitteeField label="Title (optional)"><Input value={title} onChange={event=>setTitle(event.target.value)} maxLength={100} disabled={retry||attempted} /></CommitteeField>

@@ -57,6 +57,25 @@ function renderEmail(job: Record<string, any>, application: Record<string, any>,
     : '<p>Sign in to the borrower app to review this application update.</p>';
   const text = `Hello ${application.member_name || 'Member'},\n\n${job.message}\n\n${fields.map(([label, value]) => `${label}: ${value}`).join('\n')}\n\nWhat you need to do:\n${action}\n\n${detailsText}\n\nCSUCC ERMPC\nThis is an automated application update.`;
   const html = `<main style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#172c24"><h1 style="font-size:22px;color:#145b3c">${escapeHtml(job.subject)}</h1><p>Hello ${escapeHtml(application.member_name || 'Member')},</p><p style="white-space:pre-wrap">${escapeHtml(job.message)}</p><dl>${fields.map(([label, value]) => `<dt style="font-weight:bold;margin-top:12px">${escapeHtml(label)}</dt><dd style="margin-left:0">${escapeHtml(value)}</dd>`).join('')}</dl><h2 style="font-size:16px">What you need to do</h2><p>${escapeHtml(action)}</p>${detailsHtml}<p>CSUCC ERMPC</p><p style="font-size:12px;color:#66736d">This is an automated application update.</p></main>`;
+
+  if (/^Loan payment (recorded|reversed)$/i.test(String(job.subject || '').trim())) {
+    const paymentText = String(job.message || '').trim();
+    const paymentDetails = `Application Number: ${application.application_id}\n${paymentText}`;
+    const paymentAction = /^Loan payment reversed$/i.test(String(job.subject || '').trim())
+      ? 'A recorded payment was reversed. Sign in to the app to review your current loan balance and payment history.'
+      : 'Your payment has been recorded. Sign in to the app to review your updated loan balance and payment history.';
+    const paymentLink = detailsUrl
+      ? `View loan details: ${detailsUrl.href}`
+      : 'Sign in to the borrower app to review your loan details and payment history.';
+    const paymentHtmlLink = detailsUrl
+      ? `<p><a style="display:inline-block;padding:12px 20px;background:#145b3c;color:white;border-radius:6px" href="${escapeHtml(detailsUrl.href)}">View Loan Details</a></p>`
+      : '<p>Sign in to the borrower app to review your loan details and payment history.</p>';
+    return {
+      subject: `CSUCC ERMPC | ${String(job.subject).trim()} | ${application.application_id}`,
+      text: `Hello ${application.member_name || 'Member'},\n\n${paymentDetails}\n\n${paymentAction}\n\n${paymentLink}\n\nCSUCC ERMPC\nThis is an automated payment update.`,
+      html: `<main style="font-family:Arial,sans-serif;max-width:600px;margin:auto;color:#172c24"><h1 style="font-size:22px;color:#145b3c">${escapeHtml(String(job.subject).trim())}</h1><p>Hello ${escapeHtml(application.member_name || 'Member')},</p><p style="white-space:pre-wrap">${escapeHtml(paymentDetails)}</p><p>${escapeHtml(paymentAction)}</p>${paymentHtmlLink}<p>CSUCC ERMPC</p><p style="font-size:12px;color:#66736d">This is an automated payment update.</p></main>`,
+    };
+  }
   return { subject, text, html };
 }
 

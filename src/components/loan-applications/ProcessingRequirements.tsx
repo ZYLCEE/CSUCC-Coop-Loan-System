@@ -23,9 +23,11 @@ const shortChecks:Record<keyof VerificationChecks,string>={identity:"Identity ch
 
 export function requirementEvidence(data:ApplicationVerification) {
   const config=data.policy?.status==="approved"?data.policy.config:null;
+  const coMakerRequired=config?.coMakerConsentRequired??null;
+  const coMakerLabel="Co-maker consent (all members)";
   return [
     {key:"borrower",label:"Borrower consent",count:data.evidence.borrower,required:config?.borrowerConsentRequired===null||config?.borrowerConsentRequired===undefined?null:config.borrowerConsentRequired?1:0},
-    {key:"co_maker",label:"Co-maker consent",count:data.evidence.coMaker,required:config?.coMakerConsentRequired===null||config?.coMakerConsentRequired===undefined?null:config.coMakerConsentRequired?1:0},
+    {key:"co_maker",label:coMakerLabel,count:data.evidence.coMaker,required:coMakerRequired===null?null:coMakerRequired?1:0},
     {key:"witness",label:"Witness names",count:data.evidence.witnesses,required:config?.witnessCount??null},
   ].map(row=>({...row,complete:row.required!==null&&(row.required===0||(row.key==="co_maker"?row.count===row.required:row.count>=row.required))}));
 }

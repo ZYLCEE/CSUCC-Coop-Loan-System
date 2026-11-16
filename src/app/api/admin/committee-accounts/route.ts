@@ -1,4 +1,4 @@
-import {committeeFailure,committeeReply,checkCommitteeError,readCommitteeBody,verifiedCommitteeAdministrator,inviteCommitteeAccount,createCommitteeAccount,sendCommitteeSetupLink,validCommitteeUuid,CommitteeError} from "@/lib/committeeServer";
+import {committeeFailure,committeeReply,checkCommitteeError,readCommitteeBody,verifiedCommitteeAdministrator,committeeServiceClient,inviteCommitteeAccount,createCommitteeAccount,sendCommitteeSetupLink,validCommitteeUuid,CommitteeError} from "@/lib/committeeServer";
 import {withRequestDeadline} from "@/lib/requestDeadline";
 import {changeCommitteeCredentials} from "@/lib/committeeCredentialActions";
 export async function GET(request:Request){
@@ -18,11 +18,14 @@ export async function POST(request:Request){
   const body=await readCommitteeBody(request);
   signal.throwIfAborted();
   const actionRequest=new Request(request.url,{headers:request.headers,signal});
-  if(body.operation==="allocate_account_number"){
-   if(!validCommitteeUuid(body.requestId))throw new CommitteeError("Reopen the account form and retry.");
-   const {session}=await verifiedCommitteeAdministrator(actionRequest);
-   const result=await session.rpc("committee_reserve_account_number",{p_request_id:body.requestId});checkCommitteeError(result.error);
+  if(body.operation==="preview_account_number"){
+   const {user}=await verifiedCommitteeAdministrator(actionRequest);
+   const result=await committeeServiceClient(actionRequest).rpc("preview_shared_account_number",{p_actor_id:user.id});
+   checkCommitteeError(result.error);
    return committeeReply(result.data);
+  }
+  if(body.operation==="allocate_account_number"){
+   throw new CommitteeError("Refresh the page to load a read-only ID preview.",410);
   }
   if(typeof body.password!=="string" || !body.password)throw new CommitteeError("Enter your account password.");
   const {session}=await verifiedCommitteeAdministrator(actionRequest,body.password);

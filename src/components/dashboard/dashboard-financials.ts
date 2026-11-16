@@ -66,7 +66,7 @@ export async function fetchDashboardDisbursement(start: string, end: string): Pr
 
   do {
     const { data, error, count } = await client.from("loan_applications")
-      .select("application_id,status,amount,date_released,processing_fee_amount_at_release,service_fee_amount_at_release", { count: "exact" })
+      .select("application_id,status,amount,date_released,processing_fee_amount_at_release,service_fee_amount_at_release,loan_insurance_premium_at_release", { count: "exact" })
       .in("status", [...releasedStatuses])
       .order("application_id", { ascending: true })
       .range(offset, offset + pageSize - 1);
@@ -91,13 +91,14 @@ export async function fetchDashboardDisbursement(start: string, end: string): Pr
       if (!validDate(row.date_released)) throw new Error("A release record has an invalid date. Reporting is unavailable.");
       if (row.date_released < start || row.date_released >= end) continue;
 
-      if (row.processing_fee_amount_at_release === null || row.service_fee_amount_at_release === null) {
+      if (row.processing_fee_amount_at_release === null || row.service_fee_amount_at_release === null || row.loan_insurance_premium_at_release === null) {
         incompleteReleaseHistory = true;
         continue;
       }
       const netCents = cents(row.amount, "A released loan") -
         cents(row.processing_fee_amount_at_release, "A processing fee") -
-        cents(row.service_fee_amount_at_release, "A service fee");
+        cents(row.service_fee_amount_at_release, "A retention fee") -
+        cents(row.loan_insurance_premium_at_release, "The LPPI premium");
       if (netCents < 0) throw new Error("A release fee exceeds its recorded principal. Reporting is unavailable.");
       totalCents += netCents;
       if (!Number.isSafeInteger(totalCents)) throw new Error("The net disbursement total is outside the supported reporting range.");

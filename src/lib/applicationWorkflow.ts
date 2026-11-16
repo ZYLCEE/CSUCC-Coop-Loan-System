@@ -58,7 +58,7 @@ export type WorkflowPolicy={
 };
 export type WorkflowEvent={id:string;action:string;actor:string;createdAt:string;details:Record<string,unknown>};
 export type ApplicationVerification={
-  applicationId:string;applicationUuid:string;memberName:string;memberNumber:string;loanType:string;loanStatus:string;
+  applicationId:string;applicationUuid:string;memberName:string;memberNumber:string;membershipType:"regular"|"associate"|null;loanType:string;loanStatus:string;
   stage:WorkflowStage;revision:number;enrolled:boolean;stale:boolean;stateHash:string;packetHash:string;
   checks:VerificationChecks;notes:string;documents:VerificationDocument[];requiredKinds:DocumentKind[];
   policy:WorkflowPolicy|null;blockers:string[];evidence:{borrower:number;coMaker:number;witnesses:number};

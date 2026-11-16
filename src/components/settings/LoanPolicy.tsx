@@ -21,7 +21,7 @@ const fields: Array<{ key: FieldKey; label: string; step: string; min: number }>
   { key: "max_loan_multiplier", label: "Max Loan Multiplier (× Share Capital)", step: "0.1", min: 0.01 },
   { key: "min_member_tenure_months", label: "Min Member Tenure (Months)", step: "1", min: 0 },
   { key: "penalty_rate_percent", label: "Penalty Rate (%/Month)", step: "0.01", min: 0 },
-  { key: "service_fee_percent", label: "Service Fee (%)", step: "0.01", min: 0 },
+  { key: "service_fee_percent", label: "Retention Fee (%)", step: "0.01", min: 0 },
   { key: "co_maker_required_above", label: "Co-Maker Required Above (₱)", step: "1000", min: 0 },
   { key: "collateral_required_above", label: "Collateral Document Required Above (₱)", step: "1000", min: 0 },
   { key: "min_loan_amount", label: "Minimum Loan Amount (₱)", step: "100", min: 0.01 },

@@ -8,7 +8,9 @@ This document records the workflow configuration used by this software project. 
 
 - Staff review identity, eligibility and affordability, and the loan terms and payment projection.
 - Required identity, payslip and applicable collateral documents must be submitted and verified.
-- Borrower consent and co-maker consent are required for the configured workflow.
+- Borrower consent is required for all applicants. When enabled in the
+  approved workflow policy, co-maker consent is required for both Regular and
+  Associate Members.
 - The borrower submits the consent through the application's OTP-verified flow. Paper evidence is also enabled in the project configuration.
 - Two witness names are recorded with the borrower's submission for this project workflow.
 
